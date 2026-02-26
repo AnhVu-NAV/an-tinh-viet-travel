@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+/* map font vars từ next/font */
+:root{
+    --font-sans: var(--font-inter);
+    --font-serif: var(--font-merriweather);
+}
+
+/* dùng lại theme cũ */
+html { scroll-behavior: smooth; }
+body { background-color: #fdfbf7; color: #2f3e46; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #fdfbf7; }
+::-webkit-scrollbar-thumb { background: #a3b18a; border-radius: 3px; }
