@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Inter, Merriweather } from "next/font/google";
 import Providers from "./providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
     subsets: ["latin", "vietnamese"],
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <html lang="en" className={`${inter.variable} ${merriweather.variable}`}>
         <body>
         <Providers>{children}</Providers>
+        <Analytics />
         </body>
         </html>
     );
