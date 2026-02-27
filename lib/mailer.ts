@@ -1,13 +1,20 @@
 // lib/mailer.ts
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// const resend = new Resend(process.env.RESEND_API_KEY);
 
 function mustEnv(name: string) {
     const v = process.env[name];
     if (!v) throw new Error(`Missing env: ${name}`);
     return v;
 }
+
+function getResend() {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) return null;
+    return new Resend(key);
+}
+
 
 export type BookingEmailPayload = {
     language: "vi" | "en";
@@ -140,10 +147,15 @@ function systemHtml(p: BookingEmailPayload) {
 }
 
 export async function sendBookingEmails(p: BookingEmailPayload) {
+    const resend = getResend();
+    if (!resend) {
+        console.warn("RESEND_API_KEY missing: skip sending booking emails");
+        return { ok: true, skipped: true };
+    }
+
     const from = mustEnv("MAIL_FROM");
     const systemEmail = p.systemEmail || mustEnv("BOOKING_NOTIFY_EMAIL");
 
-    // 1) customer
     await resend.emails.send({
         from,
         to: [p.toCustomer],
@@ -154,11 +166,12 @@ export async function sendBookingEmails(p: BookingEmailPayload) {
         html: customerHtml(p),
     });
 
-    // 2) system/admin
     await resend.emails.send({
         from,
         to: [systemEmail],
         subject: `New booking #${p.bookingId}`,
         html: systemHtml({ ...p, systemEmail }),
     });
+
+    return { ok: true, skipped: false };
 }
