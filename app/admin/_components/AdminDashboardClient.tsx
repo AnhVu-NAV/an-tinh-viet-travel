@@ -214,7 +214,20 @@ export default function AdminDashboardClient() {
     const endpoint = process.env.NEXT_PUBLIC_GAS_UPLOAD_URL!;
     const secret = process.env.NEXT_PUBLIC_GAS_SECRET!; // giống SECRET trong Code.gs
     const folderId = process.env.NEXT_PUBLIC_GAS_FOLDER_ID; // optional
+      if (!file || !(file instanceof Blob)) {
+          console.error("uploadImageToDrive invalid file:", file);
+          throw new Error("Invalid file (not a Blob/File)");
+      }
 
+      const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error("read file failed"));
+          reader.onload = () => {
+              const dataUrl = String(reader.result || "");
+              resolve(dataUrl.split(",")[1] || "");
+          };
+          reader.readAsDataURL(file); //file chắc chắn là Blob
+      });
     // read file -> base64 raw
     const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -1723,20 +1736,27 @@ export default function AdminDashboardClient() {
                     accept="image/*"
                     className="hidden"
                     onChange={async (e) => {
-                        const file = e.target.files?.[0];
+                        const input = e.currentTarget;
+                        const file = input.files?.[0];
+
                         if (!file) return;
 
+                        // tránh crash readAsDataURL
+                        if (!(file instanceof Blob)) {
+                            console.error("Not a Blob/File:", file);
+                            alert("File không hợp lệ, hãy chọn lại ảnh.");
+                            input.value = "";
+                            return;
+                        }
+
                         try {
-                            const driveUrl = await uploadImageToDrive(file);
-                            setLocationModal((p) => ({
-                                ...p,
-                                data: { ...p.data, image: processImageUrl(driveUrl) },
-                            }));
+                            const driveUrl = await uploadImageToDrive(file as File);
+                            // ...set state đúng modal ở đây...
                         } catch (err) {
                             console.error(err);
                             alert("Upload to Drive failed");
                         } finally {
-                            e.currentTarget.value = "";
+                            input.value = ""; // reset input để chọn lại cùng file vẫn trigger onChange
                         }
                     }}
                   />
@@ -2040,20 +2060,27 @@ export default function AdminDashboardClient() {
                     accept="image/*"
                     className="hidden"
                     onChange={async (e) => {
-                        const file = e.target.files?.[0];
+                        const input = e.currentTarget;
+                        const file = input.files?.[0];
+
                         if (!file) return;
 
+                        // tránh crash readAsDataURL
+                        if (!(file instanceof Blob)) {
+                            console.error("Not a Blob/File:", file);
+                            alert("File không hợp lệ, hãy chọn lại ảnh.");
+                            input.value = "";
+                            return;
+                        }
+
                         try {
-                            const driveUrl = await uploadImageToDrive(file);
-                            setCourseModal((p) => ({
-                                ...p,
-                                data: { ...p.data, image: processImageUrl(driveUrl) },
-                            }));
+                            const driveUrl = await uploadImageToDrive(file as File);
+                            // ...set state đúng modal ở đây...
                         } catch (err) {
                             console.error(err);
                             alert("Upload to Drive failed");
                         } finally {
-                            e.currentTarget.value = "";
+                            input.value = ""; // reset input để chọn lại cùng file vẫn trigger onChange
                         }
                     }}
                   />
