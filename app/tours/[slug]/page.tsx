@@ -102,7 +102,13 @@ export default function TourDetailPage() {
             </div>
         );
     }
-
+    if (!tour) {
+        return (
+            <div className="max-w-7xl mx-auto p-8">
+                <p className="text-stone-500">Tour not found.</p>
+            </div>
+        );
+    }
     return (
         <div className="bg-white min-h-screen pb-20">
             {/* Hero Image */}
