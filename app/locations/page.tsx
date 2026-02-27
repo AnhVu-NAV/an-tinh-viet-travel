@@ -98,7 +98,7 @@ export default function LocationsPage() {
                             <Link href={`/locations/${loc.id}`} className="relative h-64 overflow-hidden block cursor-pointer">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
-                                    src={loc.images}
+                                    src={loc.image}
                                     alt={loc.name[language]}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                                 />
