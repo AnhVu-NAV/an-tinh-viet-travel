@@ -457,9 +457,18 @@ export const DISCOUNTS: Discount[] = [
 ];
 
 export const MOCK_USERS: User[] = [
-  { id: 'u1', name: 'Nguyen Van An', email: 'user@antinh.com', role: 'USER', active: true },
-  { id: 'a1', name: 'Master Admin', email: 'admin@antinh.com', role: 'ADMIN', active: true },
-  { id: 's1', name: 'Sale Staff', email: 'sale@antinh.com', role: 'SALE', active: true },
+    {
+        id: 'u1', name: 'Nguyen Van An', email: 'user@antinh.com', role: 'USER', active: true,
+        phone: "0121312432"
+    },
+    {
+        id: 'a1', name: 'Master Admin', email: 'admin@antinh.com', role: 'ADMIN', active: true,
+        phone: "0121312432"
+    },
+    {
+        id: 's1', name: 'Sale Staff', email: 'sale@antinh.com', role: 'SALE', active: true,
+        phone: "0121312432"
+    },
 ];
 
 export const REVIEWS: Review[] = [
