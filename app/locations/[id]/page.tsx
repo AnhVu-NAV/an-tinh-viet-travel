@@ -93,8 +93,15 @@ export default function LocationDetailPage() {
             </div>
         );
     }
-
+    if (!location) {
+        return (
+            <div className="max-w-7xl mx-auto p-8">
+                <p className="text-stone-500">Location not found.</p>
+            </div>
+        );
+    }
     return (
+
         <div className="min-h-screen bg-sand-50 pb-20">
             {/* Hero */}
             <div className="relative h-[60vh]">
