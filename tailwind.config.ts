@@ -8,19 +8,6 @@ const config: Config = {
         "./providers/**/*.{js,ts,jsx,tsx,mdx}",
         "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     ],
-    safelist: [
-        "bg-primary",
-        "bg-primary-light",
-        "bg-primary-dark",
-        "text-primary",
-        "text-primary-light",
-        "text-primary-dark",
-        "bg-sand-50",
-        "bg-sand-100",
-        "bg-sand-200",
-        "text-earth-900",
-        "text-earth-800",
-    ],
     theme: {
         extend: {
             colors: {
