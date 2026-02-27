@@ -99,7 +99,7 @@ export default function LocationDetailPage() {
             {/* Hero */}
             <div className="relative h-[60vh]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={location.images} alt={location.name[language]} className="w-full h-full object-cover" />
+                <img src={location.image ?? "/placeholder.jpg"} alt={location.name[language]} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-stone-900/90 via-transparent to-transparent" />
 
                 <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 max-w-7xl mx-auto">
@@ -209,7 +209,7 @@ export default function LocationDetailPage() {
                             <h3 className="font-bold text-earth-900 mb-4">{language === "vi" ? "Thư viện ảnh" : "Gallery"}</h3>
                             <div className="grid grid-cols-2 gap-2">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={location.images} className="w-full h-32 object-cover rounded-xl col-span-2" alt="" />
+                                <img src={location.image ?? "/placeholder.jpg"} className="w-full h-32 object-cover rounded-xl col-span-2" alt="" />
                                 <div className="w-full h-24 bg-sand-100 rounded-xl flex items-center justify-center text-stone-300">Image 2</div>
                                 <div className="w-full h-24 bg-sand-100 rounded-xl flex items-center justify-center text-stone-300">Image 3</div>
                             </div>
