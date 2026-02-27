@@ -142,7 +142,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = async (email: string, role: User["role"] = "USER") => {
-        setUser({ id: "temp", name: email.split("@")[0], email, role, active: true });
+        setUser({phone: "", id: "temp", name: email.split("@")[0], email, role, active: true });
         await refresh();
     };
     const logout = async () => {
