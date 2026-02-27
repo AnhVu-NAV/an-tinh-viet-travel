@@ -5,12 +5,14 @@ import { Resend } from "resend";
 
 function mustEnv(name: string) {
     const v = process.env[name];
+    console.log(name, v);
     if (!v) throw new Error(`Missing env: ${name}`);
     return v;
 }
 
 function getResend() {
     const key = process.env.RESEND_API_KEY;
+    console.log(key);
     if (!key) return null;
     return new Resend(key);
 }

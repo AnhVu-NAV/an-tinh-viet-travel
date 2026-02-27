@@ -136,6 +136,8 @@ export default function BookingPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
+        const data = await res.json();
+        console.log("emailSent:", data.emailSent);
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));

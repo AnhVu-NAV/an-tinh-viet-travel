@@ -115,6 +115,7 @@ export async function POST(req: Request) {
 
             return { booking, pricing: { totalPrice, discountAmount, finalPrice, percent } };
         });
+        let emailSent = false;
         try {
             const notifyEmail = process.env.BOOKING_NOTIFY_EMAIL || "";
 
@@ -144,6 +145,7 @@ export async function POST(req: Request) {
                     totalVnd: booking.totalPrice,
                     discountCode: booking.discountCode ?? null,
                 });
+                emailSent = true;
             }
         } catch (mailErr) {
             // không block booking nếu mail fail
