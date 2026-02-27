@@ -229,17 +229,6 @@ export default function AdminDashboardClient() {
           reader.readAsDataURL(file); //file chắc chắn là Blob
       });
     // read file -> base64 raw
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error("read file failed"));
-      reader.onload = () => {
-        const dataUrl = String(reader.result || "");
-        // data:image/png;base64,AAAA -> lấy phần sau dấu phẩy
-        resolve(dataUrl.split(",")[1] || "");
-      };
-      reader.readAsDataURL(file);
-    });
-
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
