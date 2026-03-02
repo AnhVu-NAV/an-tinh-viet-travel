@@ -2,40 +2,59 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-export async function PATCH(
+export async function POST(
     _req: Request,
-    ctx: { params: Promise<{ id: string }> }
+    ctx: { params: Promise<{ id: string }> } // ✅ params là Promise
 ) {
-    const { id } = await ctx.params;
-
     try {
-        const result = await prisma.$transaction(async (tx) => {
-            const bk = await tx.booking.findUnique({
-                where: { id },
-                select: { id: true, status: true, scheduleId: true, guests: true },
-            });
-            if (!bk) throw new Error("NOT_FOUND");
-            if (bk.status === "CANCELLED") return { alreadyCancelled: true };
+        const { id: bookingId } = await ctx.params; // ✅ unwrap params
 
-            // restore slots
-            await tx.schedule.update({
-                where: { id: bk.scheduleId },
-                data: { slotsLeft: { increment: bk.guests } },
-            });
+        if (!bookingId) {
+            return NextResponse.json({ message: "Missing booking id" }, { status: 400 });
+        }
 
-            const updated = await tx.booking.update({
-                where: { id },
+        const booking = await prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: {
+                id: true,
+                status: true,
+                guests: true,
+                scheduleId: true,
+            },
+        });
+
+        if (!booking) {
+            return NextResponse.json({ message: "Booking not found" }, { status: 404 });
+        }
+
+        if (!(booking.status === "PENDING" || booking.status === "PAID")) {
+            return NextResponse.json(
+                { message: "This booking cannot be cancelled" },
+                { status: 400 }
+            );
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.booking.update({
+                where: { id: bookingId },
                 data: { status: "CANCELLED" },
             });
 
-            return { booking: updated };
+            // nếu 1 booking = 1 slot, đổi booking.guests -> 1
+            await tx.schedule.update({
+                where: { id: booking.scheduleId },
+                data: { slotsLeft: { increment: booking.guests ?? 1 } },
+            });
         });
 
-        return NextResponse.json(result);
+        return NextResponse.json({ ok: true });
     } catch (e: any) {
-        const msg = String(e?.message ?? "");
-        if (msg === "NOT_FOUND") return NextResponse.json({ message: "Not found" }, { status: 404 });
-        return NextResponse.json({ message: "Cancel failed" }, { status: 400 });
+        console.error("Cancel error:", e);
+        return NextResponse.json(
+            { message: e?.message ?? "Server error" },
+            { status: 500 }
+        );
     }
 }

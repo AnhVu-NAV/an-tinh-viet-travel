@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Language, Currency, User, Booking, Tour, Location, Course, Discount, Review } from "@/lib/types";
-import { EXCHANGE_RATE } from "@/lib/constants"; // giữ exchange rate thôi (hoặc đưa vào env/config)
+import { EXCHANGE_RATE } from "@/lib/constants";
 
 type AppContextType = {
     language: Language;
@@ -11,7 +11,9 @@ type AppContextType = {
     setCurrency: (curr: Currency) => void;
 
     user: User | null;
-    login: (email: string, role?: User["role"]) => void;
+    authReady: boolean;
+
+    login: (email: string, password: string) => Promise<User>;
     logout: () => void;
 
     tours: Tour[];
@@ -21,7 +23,7 @@ type AppContextType = {
     reviews: Review[];
     bookings: Booking[];
 
-    addBooking: (booking: Booking) => void;
+    addBooking: (booking: Omit<Booking, "id" | "date" | "status">) => Promise<void>;
     updateBookingStatus: (id: string, status: Booking["status"]) => void;
     addReview: (review: Review) => void;
 
@@ -34,6 +36,12 @@ type AppContextType = {
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const LS_KEYS = {
+    user: "app_user",
+    lang: "app_lang",
+    curr: "app_curr",
+};
 
 const translations: Record<string, { vi: string; en: string }> = {
     "nav.home": { vi: "Trang chủ", en: "Home" },
@@ -54,12 +62,21 @@ async function fetchJSON<T>(url: string, signal?: AbortSignal): Promise<T> {
     return res.json();
 }
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-    const [language, setLanguage] = useState<Language>("vi");
-    const [currency, setCurrency] = useState<Currency>("VND");
+function safeParse<T>(raw: string | null): T | null {
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw) as T;
+    } catch {
+        return null;
+    }
+}
 
-    // Auth mock tạm (DB auth làm sau)
-    const [user, setUser] = useState<User | null>(null);
+export function AppProvider({ children }: { children: React.ReactNode }) {
+    const [language, setLanguageState] = useState<Language>("vi");
+    const [currency, setCurrencyState] = useState<Currency>("VND");
+
+    const [user, setUserState] = useState<User | null>(null);
+    const [authReady, setAuthReady] = useState(false);
 
     const [tours, setTours] = useState<Tour[]>([]);
     const [locations, setLocations] = useState<Location[]>([]);
@@ -80,10 +97,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(priceVnd / EXCHANGE_RATE);
     };
 
-    const refresh = async () => {
+    // Hydrate localStorage
+    useEffect(() => {
+        const u = safeParse<User>(localStorage.getItem(LS_KEYS.user));
+        const lang = (localStorage.getItem(LS_KEYS.lang) as Language | null) ?? null;
+        const curr = (localStorage.getItem(LS_KEYS.curr) as Currency | null) ?? null;
+
+        if (lang === "vi" || lang === "en") setLanguageState(lang);
+        if (curr === "VND" || curr === "USD") setCurrencyState(curr);
+        if (u?.id && u?.email) setUserState(u);
+
+        setAuthReady(true);
+    }, []);
+
+    const setLanguage = (lang: Language) => {
+        setLanguageState(lang);
+        localStorage.setItem(LS_KEYS.lang, lang);
+    };
+
+    const setCurrency = (curr: Currency) => {
+        setCurrencyState(curr);
+        localStorage.setItem(LS_KEYS.curr, curr);
+    };
+
+    const setUser = (u: User | null) => {
+        setUserState(u);
+        if (u) localStorage.setItem(LS_KEYS.user, JSON.stringify(u));
+        else localStorage.removeItem(LS_KEYS.user);
+    };
+
+    // ✅ refresh nhận overrideUser để tránh stale state
+    const refreshInternal = async (overrideUser?: User | null) => {
         setLoading(true);
         setError(null);
         const controller = new AbortController();
+
+        const u = overrideUser ?? user;
 
         try {
             const [toursData, locationsData, coursesData, discountsData, reviewsData] = await Promise.all([
@@ -100,14 +149,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setDiscounts(discountsData);
             setReviews(reviewsData);
 
-            // booking: chỉ fetch khi có user (và bạn có endpoint my)
-            if (user) {
-                const myBookings = await fetchJSON<Booking[]>("/api/bookings/my", controller.signal);
-                setBookings(myBookings);
+            if (u?.id) {
+                const res = await fetch("/api/me/profile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    cache: "no-store",
+                    body: JSON.stringify({ userId: u.id, email: u.email, phone: u.phone ?? null }),
+                    signal: controller.signal,
+                });
+                const data = await res.json().catch(() => ({}));
+                setBookings(data?.bookings ?? []);
             } else {
                 setBookings([]);
             }
-
         } catch (e: any) {
             setError(e?.message || "Failed to load data");
         } finally {
@@ -115,13 +169,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Load data từ DB khi app mount
-    useEffect(() => {
-        const controller = new AbortController();
+    const refresh = async () => refreshInternal();
 
+    useEffect(() => {
+        if (!authReady) return;
+        // load core data once
+        const controller = new AbortController();
         (async () => {
-            setLoading(true);
-            setError(null);
             try {
                 const [toursData, locationsData, coursesData] = await Promise.all([
                     fetchJSON<Tour[]>("/api/tours", controller.signal),
@@ -131,6 +185,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 setTours(toursData);
                 setLocations(locationsData);
                 setCourses(coursesData);
+
+                if (user?.id) await refreshInternal(user);
             } catch (e: any) {
                 if (e?.name !== "AbortError") setError(e?.message || "Failed to load data");
             } finally {
@@ -139,21 +195,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         })();
 
         return () => controller.abort();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authReady]);
 
-    const login = async (email: string, role: User["role"] = "USER") => {
-        setUser({phone: "", id: "temp", name: email.split("@")[0], email, role, active: true });
-        await refresh();
+    // ✅ Login returns user để LoginPage redirect theo role
+    const login = async (email: string, password: string) => {
+        setError(null);
+
+        const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({ email, password }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.message ?? "Login failed");
+
+        const nextUser: User = {
+            id: data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            phone: data.user.phone ?? "",
+            role: data.user.role,
+            active: true,
+        };
+
+        setUser(nextUser);
+        await refreshInternal(nextUser);
+        return nextUser;
     };
-    const logout = async () => {
+
+    const logout = () => {
         setUser(null);
         setBookings([]);
     };
 
-    const addBooking = async (payload: Omit<Booking,"id"|"date"|"status">) => {
-        const res = await fetch("/api/bookings", { method:"POST", body: JSON.stringify(payload) });
+    const addBooking = async (payload: Omit<Booking, "id" | "date" | "status">) => {
+        const res = await fetch("/api/bookings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
         const newBooking = await res.json();
-        setBookings(prev => [newBooking, ...prev]);
+        setBookings((prev) => [newBooking, ...prev]);
     };
 
     const updateBookingStatus = (id: string, status: Booking["status"]) => {
@@ -171,6 +256,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             currency,
             setCurrency,
             user,
+            authReady,
             login,
             logout,
             tours,
@@ -188,7 +274,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             error,
             refresh,
         }),
-        [language, currency, user, tours, locations, courses, discounts, reviews, bookings, loading, error]
+        [language, currency, user, authReady, tours, locations, courses, discounts, reviews, bookings, loading, error]
     );
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
