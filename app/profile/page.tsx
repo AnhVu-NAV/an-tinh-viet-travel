@@ -13,12 +13,16 @@ type Lang = "vi" | "en";
 type Booking = {
     id: string;
     userId?: string | null;
+
     tourId: string;
+    scheduleId?: string; // ✅ để cancel/trả slot (nếu API có)
     guests: number;
     totalPrice: number;
     currency: string;
     status: "PENDING" | "PAID" | "COMPLETED" | "CANCELLED";
-    date: string; // YYYY-MM-DD
+
+    date: string; // booking created date: YYYY-MM-DD
+    departureDate?: string; // ✅ optional: YYYY-MM-DD (nếu API trả schedule.startDate)
 };
 
 type TourLite = {
@@ -38,7 +42,14 @@ type Review = {
 };
 
 type MeProfileRes = {
-    user: { id: string; name: string; email: string; phone?: string | null; role: "USER" | "ADMIN" | "SALE"; active: boolean };
+    user: {
+        id: string;
+        name: string;
+        email: string;
+        phone?: string | null;
+        role: "USER" | "ADMIN" | "SALE";
+        active: boolean;
+    };
     bookings: Booking[];
     tours: TourLite[];
     reviews: Review[];
@@ -60,9 +71,28 @@ export default function ProfileClient() {
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState("");
 
+    // Cancel state
+    const [cancelingId, setCancelingId] = useState<string | null>(null);
+
     useEffect(() => {
         if (!user) router.replace("/login");
     }, [user, router]);
+
+    const reloadProfile = async () => {
+        if (!user) return;
+
+        const res = await fetch("/api/me/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({ userId: user.id, email: user.email, phone: user.phone ?? null }),
+        });
+        if (!res.ok) throw new Error(`profile load failed: ${res.status}`);
+        const data = (await res.json()) as MeProfileRes;
+        setBookings(data.bookings ?? []);
+        setTours(data.tours ?? []);
+        setReviews(data.reviews ?? []);
+    };
 
     // load profile from DB
     useEffect(() => {
@@ -72,19 +102,9 @@ export default function ProfileClient() {
         (async () => {
             try {
                 setLoading(true);
-                const res = await fetch("/api/me/profile", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    cache: "no-store",
-                    body: JSON.stringify({ userId: user.id, email: user.email, phone: user.phone ?? null }),
-                });
-                if (!res.ok) throw new Error(`profile load failed: ${res.status}`);
-                const data = (await res.json()) as MeProfileRes;
-                if (!alive) return;
-
-                setBookings(data.bookings ?? []);
-                setTours(data.tours ?? []);
-                setReviews(data.reviews ?? []);
+                await reloadProfile();
+            } catch (e) {
+                console.error("Load profile error:", e);
             } finally {
                 if (alive) setLoading(false);
             }
@@ -93,7 +113,8 @@ export default function ProfileClient() {
         return () => {
             alive = false;
         };
-    }, [user]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id]);
 
     const userBookings = useMemo(
         () => [...bookings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -101,6 +122,42 @@ export default function ProfileClient() {
     );
 
     const hasReviewed = (bookingId: string) => reviews.some((r) => r.bookingId === bookingId);
+
+    const canCancel = (b: Booking) => b.status === "PAID" || b.status === "PENDING";
+
+    const handleCancel = async (bookingId: string) => {
+        if (!confirm(language === "vi" ? "Bạn chắc chắn muốn hủy đặt chỗ này?" : "Are you sure you want to cancel this booking?")) return;
+
+        try {
+            setCancelingId(bookingId);
+
+            // optimistic
+            setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: "CANCELLED" } : b)));
+
+            const res = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                cache: "no-store",
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                // rollback bằng reload
+                await reloadProfile();
+                alert(err?.message ?? (language === "vi" ? "Hủy thất bại" : "Cancel failed"));
+                return;
+            }
+
+            // nếu muốn chắc chắn đồng bộ: reload (tuỳ bạn)
+            await reloadProfile();
+        } catch (e) {
+            console.error("Cancel booking error:", e);
+            await reloadProfile();
+            alert(language === "vi" ? "Lỗi hệ thống" : "Server error");
+        } finally {
+            setCancelingId(null);
+        }
+    };
 
     const handleSubmitReview = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -135,19 +192,10 @@ export default function ProfileClient() {
         });
 
         if (!res.ok) {
-            // rollback: reload profile (đơn giản & chắc)
-            const re = await fetch("/api/me/profile", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                cache: "no-store",
-                body: JSON.stringify({ userId: user.id, email: user.email, phone: user.phone ?? null }),
-            });
-            if (re.ok) {
-                const data = (await re.json()) as MeProfileRes;
-                setBookings(data.bookings ?? []);
-                setTours(data.tours ?? []);
-                setReviews(data.reviews ?? []);
-            }
+            // rollback: reload profile
+            try {
+                await reloadProfile();
+            } catch {}
         }
     };
 
@@ -159,8 +207,9 @@ export default function ProfileClient() {
                 {/* Profile Header */}
                 <div className="bg-white rounded-3xl shadow-sm border border-sand-200 p-8 mb-8 flex flex-col md:flex-row items-center gap-6">
                     <div className="w-24 h-24 bg-primary text-white rounded-full flex items-center justify-center text-3xl font-bold border-4 border-sand-100">
-                        {user.name.charAt(0)}
+                        {user.name?.charAt(0) ?? "U"}
                     </div>
+
                     <div className="text-center md:text-left flex-1">
                         <h1 className="text-3xl font-serif font-bold text-earth-900">{user.name}</h1>
                         <p className="text-stone-500">{user.email}</p>
@@ -168,6 +217,7 @@ export default function ProfileClient() {
               {user.role}
             </span>
                     </div>
+
                     <div className="flex gap-3">
                         <Button variant={activeTab === "history" ? "primary" : "secondary"} onClick={() => setActiveTab("history")}>
                             {language === "vi" ? "Lịch sử đặt chỗ" : "Booking History"}
@@ -201,12 +251,15 @@ export default function ProfileClient() {
                                     const isCompleted = booking.status === "COMPLETED";
                                     const isReviewed = hasReviewed(booking.id);
 
+                                    const displayDate = booking.departureDate ?? booking.date;
+
                                     return (
                                         <div
                                             key={booking.id}
                                             className="bg-white rounded-2xl p-6 shadow-sm border border-sand-100 hover:shadow-md transition-shadow flex flex-col md:flex-row gap-6"
                                         >
                                             <div className="w-full md:w-48 h-32 rounded-xl overflow-hidden shrink-0">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img src={tour?.images?.[0] ?? "/placeholder.jpg"} alt="" className="w-full h-full object-cover" />
                                             </div>
 
@@ -241,8 +294,10 @@ export default function ProfileClient() {
 
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-stone-600 mb-4">
                                                     <div>
-                                                        <span className="block text-xs text-stone-400 uppercase">{language === "vi" ? "Ngày khởi hành" : "Date"}</span>
-                                                        <span className="font-medium">{booking.date}</span>
+                            <span className="block text-xs text-stone-400 uppercase">
+                              {language === "vi" ? "Ngày khởi hành" : "Departure"}
+                            </span>
+                                                        <span className="font-medium">{displayDate}</span>
                                                     </div>
                                                     <div>
                                                         <span className="block text-xs text-stone-400 uppercase">{language === "vi" ? "Số khách" : "Guests"}</span>
@@ -255,11 +310,29 @@ export default function ProfileClient() {
                                                 </div>
 
                                                 <div className="flex justify-end gap-3 border-t border-sand-50 pt-4">
+                                                    {/* Nếu route tours/[slug] của bạn nhận id thì OK */}
                                                     <Link href={`/tours/${booking.tourId}`}>
                                                         <Button variant="ghost" size="sm">
                                                             {language === "vi" ? "Xem lại Tour" : "View Tour"}
                                                         </Button>
                                                     </Link>
+
+                                                    {canCancel(booking) && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={cancelingId === booking.id}
+                                                            onClick={() => handleCancel(booking.id)}
+                                                        >
+                                                            {cancelingId === booking.id
+                                                                ? language === "vi"
+                                                                    ? "Đang hủy..."
+                                                                    : "Canceling..."
+                                                                : language === "vi"
+                                                                    ? "Hủy đặt chỗ"
+                                                                    : "Cancel"}
+                                                        </Button>
+                                                    )}
 
                                                     {isCompleted && !isReviewed && (
                                                         <Button size="sm" onClick={() => setReviewModal({ isOpen: true, bookingId: booking.id, tourId: booking.tourId })}>
@@ -269,7 +342,8 @@ export default function ProfileClient() {
 
                                                     {isReviewed && (
                                                         <span className="text-sm text-stone-400 flex items-center px-4">
-                              <Star className="w-4 h-4 mr-1 text-amber-400 fill-amber-400" /> {language === "vi" ? "Đã đánh giá" : "Reviewed"}
+                              <Star className="w-4 h-4 mr-1 text-amber-400 fill-amber-400" />{" "}
+                                                            {language === "vi" ? "Đã đánh giá" : "Reviewed"}
                             </span>
                                                     )}
                                                 </div>
@@ -287,8 +361,12 @@ export default function ProfileClient() {
             {reviewModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg p-8 animate-slide-up">
-                        <h3 className="text-2xl font-serif font-bold text-earth-900 mb-2">{language === "vi" ? "Đánh giá chuyến đi" : "Rate your journey"}</h3>
-                        <p className="text-stone-500 mb-6">{language === "vi" ? "Chia sẻ trải nghiệm của bạn để giúp cộng đồng." : "Share your experience to help the community."}</p>
+                        <h3 className="text-2xl font-serif font-bold text-earth-900 mb-2">
+                            {language === "vi" ? "Đánh giá chuyến đi" : "Rate your journey"}
+                        </h3>
+                        <p className="text-stone-500 mb-6">
+                            {language === "vi" ? "Chia sẻ trải nghiệm của bạn để giúp cộng đồng." : "Share your experience to help the community."}
+                        </p>
 
                         <form onSubmit={handleSubmitReview}>
                             <div className="flex justify-center gap-2 mb-6">
@@ -297,7 +375,9 @@ export default function ProfileClient() {
                                         key={star}
                                         type="button"
                                         onClick={() => setRating(star)}
-                                        className={`p-2 transition-transform hover:scale-110 ${star <= rating ? "text-amber-400 fill-amber-400" : "text-stone-200"}`}
+                                        className={`p-2 transition-transform hover:scale-110 ${
+                                            star <= rating ? "text-amber-400 fill-amber-400" : "text-stone-200"
+                                        }`}
                                     >
                                         <Star className={`w-8 h-8 ${star <= rating ? "fill-current" : ""}`} />
                                     </button>

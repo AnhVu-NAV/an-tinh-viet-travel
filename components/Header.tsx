@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useApp } from "@/providers/AppContext";
 import { Menu, X, Globe, DollarSign, User as UserIcon, LayoutDashboard, Flower, LogOut, ChevronDown } from "lucide-react";
 import {Button} from "@/components/Button";
+import Image from "next/image";
 
 export default function Header() {
     const { language, setLanguage, currency, setCurrency, user, logout, t } = useApp();
@@ -35,7 +36,13 @@ export default function Header() {
                 <div className="flex justify-between items-center h-20">
                     {/* Logo */}
                     <Link href="/" className="flex items-center space-x-2 group">
-                        <Flower className="w-8 h-8 text-primary group-hover:rotate-45 transition-transform duration-500" />
+                        <Image
+                            src="/logo.png" // đặt ảnh trong thư mục public
+                            alt="An Tinh Viet Logo"
+                            width={80}
+                            height={80}
+                            className="group-hover:rotate-45 transition-transform duration-500"
+                        />
                         <span className="text-2xl font-serif font-bold text-earth-900 tracking-tight">An Tinh Viet</span>
                     </Link>
 

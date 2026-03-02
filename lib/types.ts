@@ -67,7 +67,7 @@ export interface Discount {
 
 export interface Booking {
   id: string;
-  userId: string; // Added to link booking to user
+  userId?: string | null;
   tourId: string;
   scheduleId: string;
   guests: number;
@@ -76,12 +76,15 @@ export interface Booking {
   status: 'PENDING' | 'PAID' | 'COMPLETED' | 'CANCELLED';
   date: string;
   discountCode?: string;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
 }
 
 export interface User {
   id: string;
   name: string;
-  phone: string;
+  phone?: string | null;
   email: string;
   role: 'USER' | 'ADMIN' | 'SALE';
   active: boolean;
