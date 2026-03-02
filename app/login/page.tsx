@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/providers/AppContext';
 import { Button } from '@/components/Button';
 import { Flower } from 'lucide-react';
+import Image from "next/image";
 
 export default function LoginPage() {
     const { login, language } = useApp();
@@ -47,7 +48,15 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center bg-sand-100 py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-3xl shadow-xl">
                 <div className="text-center">
-                    <Flower className="mx-auto h-12 w-12 text-primary animate-pulse" />
+                    <div className="flex justify-center mb-6">
+                        <Image
+                            src="/logo.png"
+                            alt="An Tinh Viet"
+                            width={100}
+                            height={60}
+                            className="object-contain opacity-90"
+                        />
+                    </div>
                     <h2 className="mt-6 text-3xl font-serif font-bold text-earth-900">
                         {language === 'vi' ? 'Chào mừng trở lại' : 'Welcome back'}
                     </h2>

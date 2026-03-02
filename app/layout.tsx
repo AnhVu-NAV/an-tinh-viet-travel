@@ -15,6 +15,22 @@ const merriweather = Merriweather({
     variable: "--font-merriweather",
 });
 
+export const metadata = {
+    title: {
+        default: "An Tinh Viet - Spiritual Travel",
+        template: "%s | An Tinh Viet",
+    },
+    description: "Hành trình an tịnh - chữa lành - khám phá Việt Nam",
+    icons: {
+        icon: "/logo.png",
+    },
+    openGraph: {
+        title: "An Tinh Viet",
+        description: "Spiritual Travel & Healing Journey in Vietnam",
+        type: "website",
+    },
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
         <html lang="en" className={`${inter.variable} ${merriweather.variable}`}>
