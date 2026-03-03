@@ -3,10 +3,18 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const toDateOnly = (d: Date) => d.toISOString().slice(0, 10);
+
 export async function GET() {
     const [toursRaw, locationsRaw, bookingsRaw, usersRaw, discountsRaw, coursesRaw] =
         await Promise.all([
-            prisma.tour.findMany({ orderBy: { id: "asc" } }),
+            prisma.tour.findMany({
+                orderBy: { id: "asc" },
+                include: {
+                    locations: true, // TourLocation rows (tourId, locationId)
+                    schedules: { orderBy: { startDate: "asc" } },
+                },
+            }),
             prisma.location.findMany({ orderBy: { id: "asc" } }),
             prisma.booking.findMany({ orderBy: { date: "desc" } }),
             prisma.user.findMany({ orderBy: { createdAt: "desc" } }),
@@ -25,8 +33,15 @@ export async function GET() {
         duration_days: t.durationDays,
         level: t.level,
         images: t.images,
-        locations: [], // admin UI đang only cần list, mapping bạn handle ở modal
-        schedule: [],
+
+        locations: t.locations.map((x) => x.locationId),
+
+        schedule: t.schedules.map((s) => ({
+            id: s.id,
+            startDate: toDateOnly(s.startDate),
+            slots: s.slots,
+            slotsLeft: s.slotsLeft,
+        })),
     }));
 
     const locations = locationsRaw.map((l) => ({
@@ -51,7 +66,7 @@ export async function GET() {
     const discounts = discountsRaw.map((d) => ({
         code: d.code,
         percent: d.percent,
-        valid_until: d.validUntil.toISOString().slice(0, 10),
+        valid_until: toDateOnly(d.validUntil),
         usage_limit: d.usageLimit,
         used_count: d.usedCount,
     }));
@@ -74,7 +89,7 @@ export async function GET() {
         totalPrice: b.totalPrice,
         currency: b.currency,
         status: b.status,
-        date: b.date.toISOString().slice(0, 10),
+        date: toDateOnly(b.date),
         contactName: b.contactName ?? null,
         contactEmail: b.contactEmail ?? null,
         contactPhone: b.contactPhone ?? null,

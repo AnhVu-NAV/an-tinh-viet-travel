@@ -25,8 +25,16 @@ import {
 import { useApp } from "@/providers/AppContext";
 import { Button } from "@/components/Button";
 import Modal from "./Modal";
+import ScheduleEditor from "@/app/admin/_components/ScheduleEditor";
 
 type Lang = "vi" | "en";
+
+type Schedule = {
+    id: string;
+    startDate: string; // yyyy-mm-dd
+    slots: number;
+    slotsLeft: number;
+};
 
 type Tour = {
   id: string;
@@ -38,7 +46,7 @@ type Tour = {
   suitable_for: Record<Lang, string>;
   locations: string[];
   images: string[];
-  schedule: any[];
+  schedule: Schedule[];
 };
 
 type Location = {
@@ -107,14 +115,15 @@ type Tab =
 
 export default function AdminDashboardClient() {
   const router = useRouter();
-  const { user, convertPrice } = useApp();
+  const { user, convertPrice, sessionReady} = useApp();
 
   // Client-side guard (giống logic React Router Navigate của bạn)
-  useEffect(() => {
-    if (!user || (user.role !== "ADMIN" && user.role !== "SALE")) {
-      router.replace("/login");
-    }
-  }, [user, router]);
+    useEffect(() => {
+        if (!sessionReady) return;
+        if (!user || (user.role !== "ADMIN" && user.role !== "SALE")) {
+            router.replace("/login");
+        }
+    }, [sessionReady, user, router]);
 
   const isSuperAdmin = user?.role === "ADMIN";
 
@@ -299,65 +308,77 @@ export default function AdminDashboardClient() {
     setCourses(data.courses ?? []);
   };
 
-  const handleSaveTour = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const data = tourModal.data;
+    const handleSaveTour = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const data = tourModal.data;
 
-    if (tourModal.mode === "ADD") {
-      const payload = {
-        id: "t" + Date.now(),
-        title: data.title,
-        price_vnd: data.price_vnd,
-        duration_days: data.duration_days,
-        level: data.level,
-        images: data.images ?? [],
-        locations: data.locations ?? [],
-        // optional nếu bạn muốn:
-        description: data.description ?? { en: "", vi: "" },
-        suitable_for: data.suitable_for ?? { en: "", vi: "" },
-      };
+        if (tourModal.mode === "ADD") {
+            const payload = {
+                id: "t" + Date.now(),
+                title: data.title,
+                price_vnd: data.price_vnd,
+                duration_days: data.duration_days,
+                level: data.level,
+                images: data.images ?? [],
+                locations: data.locations ?? [],
+                description: data.description ?? { en: "", vi: "" },
+                suitable_for: data.suitable_for ?? { en: "", vi: "" },
 
-      const res = await fetch("/api/admin/tours", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+                // NOTE: schedule KHÔNG gửi trong create tour (tour API của bạn hiện chưa xử lý)
+            };
 
-      if (res.ok) {
-        const created = (await res.json()) as Tour;
-        setTours((prev) => [...prev, created]);
-      } else {
-        await refetchBootstrap();
-      }
-    } else {
-      const res = await fetch(
-        `/api/admin/tours/${encodeURIComponent(String(data.id))}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: data.title,
-            price_vnd: data.price_vnd,
-            duration_days: data.duration_days,
-            level: data.level,
-            images: data.images ?? [],
-            locations: data.locations ?? [],
-          }),
-        },
-      );
+            const res = await fetch("/api/admin/tours", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
 
-      if (res.ok) {
-        const updated = (await res.json()) as Tour;
-        setTours((prev) =>
-          prev.map((t) => (t.id === updated.id ? updated : t)),
-        );
-      } else {
-        await refetchBootstrap();
-      }
-    }
+            if (res.ok) {
+                const created = (await res.json()) as Tour;
 
-    setTourModal((p) => ({ ...p, isOpen: false }));
-  };
+                const schedules = (data.schedule ?? []) as Array<{ startDate: string; slots: number }>;
+                if (schedules.length > 0) {
+                    await Promise.all(
+                        schedules.map((s) =>
+                            fetch(`/api/admin/tours/${encodeURIComponent(created.id)}/schedules`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ startDate: s.startDate, slots: Number(s.slots ?? 0) }),
+                            })
+                        )
+                    );
+                }
+
+                // ✅ refetch để tours có schedule đúng từ DB (khuyên)
+                await refetchBootstrap();
+                // hoặc nếu muốn optimistic: setTours([...prev, created]) nhưng created chưa có schedule
+            } else {
+                await refetchBootstrap();
+            }
+        } else {
+            const res = await fetch(`/api/admin/tours/${encodeURIComponent(String(data.id))}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: data.title,
+                    price_vnd: data.price_vnd,
+                    duration_days: data.duration_days,
+                    level: data.level,
+                    images: data.images ?? [],
+                    locations: data.locations ?? [],
+                }),
+            });
+
+            if (res.ok) {
+                const updated = (await res.json()) as Tour;
+                setTours((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+            } else {
+                await refetchBootstrap();
+            }
+        }
+
+        setTourModal((p) => ({ ...p, isOpen: false }));
+    };
 
   const handleSaveLocation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -630,7 +651,14 @@ export default function AdminDashboardClient() {
     </button>
   );
 
-  if (!user) return null;
+    if (!sessionReady) {
+        return (
+            <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+    if (!user) return null;
 
   return (
     <div className="min-h-screen bg-sand-50 flex font-sans text-earth-900">
@@ -900,11 +928,7 @@ export default function AdminDashboardClient() {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            setTourModal({
-                              isOpen: true,
-                              mode: "EDIT",
-                              data: tour,
-                            })
+                              setTourModal({ isOpen: true, mode: "EDIT", data: tour })
                           }
                         >
                           <Edit className="w-4 h-4 text-stone-500" />
@@ -1581,7 +1605,20 @@ export default function AdminDashboardClient() {
               ))}
             </div>
           </div>
+        <div className="pt-6 border-t border-sand-100">
+            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                Tour Schedules (Start dates)
+            </label>
 
+            <ScheduleEditor
+                mode={tourModal.mode}
+                tourId={tourModal.mode === "EDIT" ? String(tourModal.data.id) : undefined}
+                schedules={(tourModal.data.schedule ?? []) as any[]}
+                onChange={(next) =>
+                    setTourModal((p) => ({ ...p, data: { ...p.data, schedule: next } }))
+                }
+            />
+        </div>
           <div className="pt-6 flex justify-end gap-3 border-t border-sand-100">
             <Button
               type="button"

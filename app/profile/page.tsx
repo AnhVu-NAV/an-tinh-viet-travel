@@ -57,7 +57,7 @@ type MeProfileRes = {
 
 export default function ProfileClient() {
     const router = useRouter();
-    const { user, language, convertPrice } = useApp();
+    const { user, language, convertPrice, sessionReady } = useApp();
 
     const [activeTab, setActiveTab] = useState<"history" | "settings">("history");
 
@@ -75,8 +75,11 @@ export default function ProfileClient() {
     const [cancelingId, setCancelingId] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!user) router.replace("/login");
-    }, [user, router]);
+        if (!sessionReady) return;
+        if (!user || (user.role !== "ADMIN" && user.role !== "SALE")) {
+            router.replace("/login");
+        }
+    }, [sessionReady, user, router]);
 
     const reloadProfile = async () => {
         if (!user) return;
@@ -199,6 +202,18 @@ export default function ProfileClient() {
         }
     };
 
+    if (!sessionReady) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-sand-50">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-stone-500 text-sm font-medium">
+                        Loading...
+                    </p>
+                </div>
+            </div>
+        );
+    }
     if (!user) return null;
 
     return (

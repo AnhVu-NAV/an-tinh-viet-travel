@@ -12,6 +12,7 @@ type AppContextType = {
 
     user: User | null;
     authReady: boolean;
+    sessionReady: boolean;
 
     login: (email: string, password: string) => Promise<User>;
     logout: () => void;
@@ -87,6 +88,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [sessionReady, setSessionReady] = useState(false);
 
     const t = (key: string) => translations[key]?.[language] || key;
 
@@ -173,24 +175,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!authReady) return;
-        // load core data once
+
         const controller = new AbortController();
+
         (async () => {
             try {
+                // load core data
                 const [toursData, locationsData, coursesData] = await Promise.all([
                     fetchJSON<Tour[]>("/api/tours", controller.signal),
                     fetchJSON<Location[]>("/api/locations", controller.signal),
                     fetchJSON<Course[]>("/api/courses", controller.signal),
                 ]);
+
                 setTours(toursData);
                 setLocations(locationsData);
                 setCourses(coursesData);
 
-                if (user?.id) await refreshInternal(user);
+                // ✅ nếu có user trong localStorage thì refresh bookings để “confirm”
+                if (user?.id) {
+                    await refreshInternal(user);
+                }
             } catch (e: any) {
                 if (e?.name !== "AbortError") setError(e?.message || "Failed to load data");
             } finally {
                 setLoading(false);
+                setSessionReady(true); // ✅ quan trọng
             }
         })();
 
@@ -257,6 +266,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setCurrency,
             user,
             authReady,
+            sessionReady,
             login,
             logout,
             tours,
@@ -274,7 +284,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             error,
             refresh,
         }),
-        [language, currency, user, authReady, tours, locations, courses, discounts, reviews, bookings, loading, error]
+        [language, currency, user, authReady, sessionReady, tours, locations, courses, discounts, reviews, bookings, loading, error]
     );
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
