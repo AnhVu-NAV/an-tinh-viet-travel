@@ -43,7 +43,7 @@ export default function HomePage() {
 
                     <div className="flex justify-center gap-4 animate-slide-up" style={{ animationDelay: "0.4s" }}>
                         <Link href="/tours">
-                            <Button size="lg" className="bg-white text-teal-900 hover:bg-sand-100 border-none font-bold">
+                            <Button size="lg" className=" text-teal-900 hover:bg-sand border-none font-bold">
                                 {t("btn.book")}
                             </Button>
                         </Link>

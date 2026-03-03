@@ -83,8 +83,13 @@ export default function TourDetailPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-white flex items-center justify-center text-stone-400">
-                {language === 'vi' ? 'Đang tải...' : 'Loading...'}
+            <div className="min-h-screen flex items-center justify-center bg-sand-50">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-stone-500 text-sm font-medium">
+                        {language === 'vi' ? 'Đang tải...' : 'Loading...'}
+                    </p>
+                </div>
             </div>
         );
     }

@@ -52,7 +52,14 @@ export default function CourseDetailPage() {
     }, [id]);
 
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center bg-sand-50 text-stone-400">Loading...</div>;
+        return <div className="min-h-screen flex items-center justify-center bg-sand-50">
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-stone-500 text-sm font-medium">
+                    {language === 'vi' ? 'Đang tải...' : 'Loading...'}
+                </p>
+            </div>
+        </div>;
     }
 
     if (!course) {
@@ -131,7 +138,7 @@ export default function CourseDetailPage() {
                         <h3 className="text-xl font-bold mb-2">{language === "vi" ? "Sẵn sàng bắt đầu hành trình?" : "Ready to start your journey?"}</h3>
                         <p className="text-teal-200 mb-6 text-sm">{language === "vi" ? "Tham gia nhóm hỗ trợ để được tư vấn trực tiếp." : "Join our support group for direct consultation."}</p>
                         <a href={course.group_link} target="_blank" rel="noopener noreferrer">
-                            <Button className="bg-white text-teal-900 hover:bg-teal-50 border-none">
+                            <Button className="text-teal-900 hover:bg-teal border-none">
                                 {language === "vi" ? "Tham gia Nhóm Ngay" : "Join Group Now"} <ExternalLink className="w-4 h-4 ml-2" />
                             </Button>
                         </a>

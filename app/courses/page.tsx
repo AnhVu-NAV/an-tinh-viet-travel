@@ -59,7 +59,14 @@ export default function CoursesPage() {
                     </p>
                 </div>
 
-                {loading && <div className="text-center text-stone-400">Loading...</div>}
+                {loading && <div className="min-h-screen flex items-center justify-center bg-sand-50">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                        <p className="text-stone-500 text-sm font-medium">
+                            {language === 'vi' ? 'Đang tải dữ liệu...' : 'Loading...'}
+                        </p>
+                    </div>
+                </div>}
 
                 {!loading && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

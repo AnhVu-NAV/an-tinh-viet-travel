@@ -148,7 +148,14 @@ export default function BookingPage() {
         setStep(3);
     };
 
-    if (loadingTour) return <div className="p-20 text-center text-stone-400">Loading...</div>;
+    if (loadingTour) return <div className="min-h-screen flex items-center justify-center bg-sand-50">
+        <div className="flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-stone-500 text-sm font-medium">
+                {language === 'vi' ? 'Đang tải...' : 'Loading...'}
+            </p>
+        </div>
+    </div>;
     if (!tour) return <div className="p-20 text-center">Tour not found</div>;
 
     return (
