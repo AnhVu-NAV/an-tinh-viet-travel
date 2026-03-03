@@ -30,10 +30,10 @@ import ScheduleEditor from "@/app/admin/_components/ScheduleEditor";
 type Lang = "vi" | "en";
 
 type Schedule = {
-    id: string;
-    startDate: string; // yyyy-mm-dd
+    id?: string;
+    startDate: string;
     slots: number;
-    slotsLeft: number;
+    slotsLeft?: number;
 };
 
 type Tour = {
@@ -1613,7 +1613,7 @@ export default function AdminDashboardClient() {
             <ScheduleEditor
                 mode={tourModal.mode}
                 tourId={tourModal.mode === "EDIT" ? String(tourModal.data.id) : undefined}
-                schedules={(tourModal.data.schedule ?? []) as any[]}
+                schedules={(tourModal.data.schedule ?? [])}
                 onChange={(next) =>
                     setTourModal((p) => ({ ...p, data: { ...p.data, schedule: next } }))
                 }
