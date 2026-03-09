@@ -50,6 +50,7 @@ const translations: Record<string, { vi: string; en: string }> = {
     "nav.locations": { vi: "Điểm đến", en: "Locations" },
     "nav.courses": { vi: "Khóa học", en: "Courses" },
     "nav.about": { vi: "Về An Tịnh", en: "Our Story" },
+    "nav.testMental": { vi: "Khảo Sát Tinh Thần", en: "Mental Health Test" },
     "nav.login": { vi: "Đăng nhập", en: "Login" },
     "nav.admin": { vi: "Quản trị", en: "Admin" },
     "hero.title": { vi: "Tìm Về Sự An Yên", en: "Find Your Inner Peace" },

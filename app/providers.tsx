@@ -2,7 +2,7 @@
 
 import React from "react";
 import { AppProvider } from "@/providers/AppContext";
-import Header from "@/components/Header";
+import {Header} from "@/components/Header";
 import Footer from "@/components/Footer";
 import Chatbot from "@/components/Chatbot";
 

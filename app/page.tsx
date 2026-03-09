@@ -1,9 +1,8 @@
 "use client";
-
 import Link from "next/link";
 import { useApp } from "@/providers/AppContext";
 import { Button } from "@/components/Button";
-import { ArrowRight, Flower, Wind, Moon } from "lucide-react";
+import { ArrowRight, Flower, Wind, Moon, BrainCircuit } from "lucide-react";
 
 export default function HomePage() {
     const { language, convertPrice, t, tours } = useApp();
@@ -19,12 +18,17 @@ export default function HomePage() {
                         alt="Vietnam Zen Landscape"
                         className="w-full h-full object-cover animate-fade-in"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-sand-50" />
+                    <div className="absolute inset-0 bg-black/25" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/10 to-sand-50" />
                 </div>
 
                 <div className="relative z-10 text-center max-w-4xl px-4 mt-20">
                     <div className="inline-block animate-slide-up" style={{ animationDelay: "0.1s" }}>
-                        <Flower className="w-12 h-12 text-white/90 mx-auto mb-4 animate-spin-slow" />
+                        <img
+                            src="/logongang.png"
+                            alt="logo"
+                            className="w-100 h-50 mx-auto mb-4 animate-spin-slow object-contain"
+                        />
                     </div>
 
                     <h1
@@ -43,7 +47,7 @@ export default function HomePage() {
 
                     <div className="flex justify-center gap-4 animate-slide-up" style={{ animationDelay: "0.4s" }}>
                         <Link href="/tours">
-                            <Button size="lg" className=" text-teal-900 hover:bg-sand border-none font-bold">
+                            <Button size="lg" className="text-teal-900 hover:bg-sand border-none font-bold">
                                 {t("btn.book")}
                             </Button>
                         </Link>
@@ -75,9 +79,9 @@ export default function HomePage() {
             <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row justify-between items-end mb-12">
                     <div>
-            <span className="text-primary font-bold uppercase tracking-widest text-xs mb-2 block">
-              {language === "vi" ? "Hành trình chọn lọc" : "Curated Journeys"}
-            </span>
+                        <span className="text-primary font-bold uppercase tracking-widest text-xs mb-2 block">
+                            {language === "vi" ? "Hành trình chọn lọc" : "Curated Journeys"}
+                        </span>
                         <h2 className="text-4xl font-serif font-bold text-earth-900">
                             {language === "vi" ? "Tìm Về Bản Ngã" : "Reconnect Within"}
                         </h2>
@@ -107,9 +111,9 @@ export default function HomePage() {
                                 </div>
 
                                 <div className="p-8 flex-1 flex flex-col">
-                  <span className="text-primary text-xs font-bold uppercase tracking-wider mb-3 block">
-                    {tour.duration_days} {language === "vi" ? "Ngày" : "Days"}
-                  </span>
+                                    <span className="text-primary text-xs font-bold uppercase tracking-wider mb-3 block">
+                                        {tour.duration_days} {language === "vi" ? "Ngày" : "Days"}
+                                    </span>
 
                                     <h3 className="text-2xl font-serif font-bold text-earth-900 mb-3 group-hover:text-primary transition-colors">
                                         {tour.title[language]}
@@ -122,13 +126,51 @@ export default function HomePage() {
                                     <div className="mt-auto pt-6 border-t border-sand-100 flex items-center justify-between">
                                         <span className="text-lg font-bold text-earth-900">{convertPrice(tour.price_vnd)}</span>
                                         <span className="w-10 h-10 rounded-full bg-sand-100 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                      <ArrowRight className="w-5 h-5" />
-                    </span>
+                                            <ArrowRight className="w-5 h-5" />
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </Link>
                     ))}
+                </div>
+            </section>
+
+            {/* Mental Health Test Intro */}
+            <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                <div className="bg-white rounded-[3rem] shadow-sm border border-sand-200 overflow-hidden flex flex-col md:flex-row items-center">
+                    <div className="md:w-1/2 p-12 md:p-16">
+                        <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-8">
+                            <BrainCircuit className="w-8 h-8" />
+                        </div>
+
+                        <h2 className="text-3xl md:text-4xl font-serif font-bold text-earth-900 mb-6 leading-tight">
+                            {language === "vi" ? "Lắng nghe sức khỏe tinh thần của bạn" : "Listen to your mental health"}
+                        </h2>
+
+                        <p className="text-stone-600 text-lg mb-8 leading-relaxed">
+                            {language === "vi"
+                                ? "Đôi khi, những áp lực vô hình khiến chúng ta mệt mỏi mà không nhận ra. Hãy dành 5 phút để làm bài kiểm tra nhỏ, giúp bạn hiểu rõ hơn về trạng thái tinh thần hiện tại và nhận những lời khuyên hữu ích từ An Tịnh Việt."
+                                : "Sometimes, invisible pressures make us tired without realizing it. Take 5 minutes to do a short test, helping you better understand your current mental state and receive useful advice from An Tinh Viet."}
+                        </p>
+
+                        <Link href="/test-mental">
+                            <Button size="lg" className="px-8 text-lg shadow-lg shadow-primary/20">
+                                {language === "vi" ? "Làm bài test ngay" : "Take the test now"}
+                                <ArrowRight className="ml-2 w-5 h-5" />
+                            </Button>
+                        </Link>
+                    </div>
+
+                    <div className="md:w-1/2 h-full min-h-[400px] relative">
+                        <img
+                            src="https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=2000&auto=format&fit=crop"
+                            alt="Mental Health"
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/50 to-transparent md:block hidden" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/50 to-transparent md:hidden block" />
+                    </div>
                 </div>
             </section>
 

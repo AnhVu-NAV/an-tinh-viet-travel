@@ -10,17 +10,17 @@ export interface Location {
   tags: string[];
   image: string;
   description?: { vi: string; en: string };
-  introduction?: { vi: string; en: string }; // Added introduction
-  history?: { vi: string; en: string }; // Added history
-  significance?: { vi: string; en: string }; // Added significance
+  introduction?: { vi: string; en: string };
+  history?: { vi: string; en: string };
+  significance?: { vi: string; en: string };
 }
 
 export interface Tour {
   id: string;
   title: { vi: string; en: string };
   description: { vi: string; en: string };
-  introduction: { vi: string; en: string }; // Added introduction
-  meaning: { vi: string; en: string }; // Added meaning
+  introduction: { vi: string; en: string };
+  meaning: { vi: string; en: string };
   price_vnd: number;
   duration_days: number;
   level: 'light' | 'moderate' | 'deep';

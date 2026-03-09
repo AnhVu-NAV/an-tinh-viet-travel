@@ -21,6 +21,17 @@ import {
   AlertTriangle,
   DollarSign,
 } from "lucide-react";
+import {
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+} from "recharts";
 
 import { useApp } from "@/providers/AppContext";
 import { Button } from "@/components/Button";
@@ -37,16 +48,18 @@ type Schedule = {
 };
 
 type Tour = {
-  id: string;
-  title: Record<Lang, string>;
-  description: Record<Lang, string>;
-  price_vnd: number;
-  duration_days: number;
-  level: "light" | "moderate" | "deep";
-  suitable_for: Record<Lang, string>;
-  locations: string[];
-  images: string[];
-  schedule: Schedule[];
+    id: string;
+    title: Record<Lang, string>;
+    description: Record<Lang, string>;
+    introduction: Record<Lang, string>;
+    meaning: Record<Lang, string>;
+    price_vnd: number;
+    duration_days: number;
+    level: "light" | "moderate" | "deep";
+    suitable_for: Record<Lang, string>;
+    locations: string[];
+    images: string[];
+    schedule: Schedule[];
 };
 
 type Location = {
@@ -315,16 +328,16 @@ export default function AdminDashboardClient() {
         if (tourModal.mode === "ADD") {
             const payload = {
                 id: "t" + Date.now(),
-                title: data.title,
-                price_vnd: data.price_vnd,
-                duration_days: data.duration_days,
-                level: data.level,
+                title: data.title ?? { en: "", vi: "" },
+                description: data.description ?? { en: "", vi: "" },
+                introduction: data.introduction ?? { en: "", vi: "" },
+                meaning: data.meaning ?? { en: "", vi: "" },
+                suitable_for: data.suitable_for ?? { en: "", vi: "" },
+                price_vnd: Number(data.price_vnd ?? 0),
+                duration_days: Number(data.duration_days ?? 1),
+                level: data.level ?? "light",
                 images: data.images ?? [],
                 locations: data.locations ?? [],
-                description: data.description ?? { en: "", vi: "" },
-                suitable_for: data.suitable_for ?? { en: "", vi: "" },
-
-                // NOTE: schedule KHÔNG gửi trong create tour (tour API của bạn hiện chưa xử lý)
             };
 
             const res = await fetch("/api/admin/tours", {
@@ -343,15 +356,16 @@ export default function AdminDashboardClient() {
                             fetch(`/api/admin/tours/${encodeURIComponent(created.id)}/schedules`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ startDate: s.startDate, slots: Number(s.slots ?? 0) }),
+                                body: JSON.stringify({
+                                    startDate: s.startDate,
+                                    slots: Number(s.slots ?? 0),
+                                }),
                             })
                         )
                     );
                 }
 
-                // ✅ refetch để tours có schedule đúng từ DB (khuyên)
                 await refetchBootstrap();
-                // hoặc nếu muốn optimistic: setTours([...prev, created]) nhưng created chưa có schedule
             } else {
                 await refetchBootstrap();
             }
@@ -360,10 +374,14 @@ export default function AdminDashboardClient() {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    title: data.title,
-                    price_vnd: data.price_vnd,
-                    duration_days: data.duration_days,
-                    level: data.level,
+                    title: data.title ?? { en: "", vi: "" },
+                    description: data.description ?? { en: "", vi: "" },
+                    introduction: data.introduction ?? { en: "", vi: "" },
+                    meaning: data.meaning ?? { en: "", vi: "" },
+                    suitable_for: data.suitable_for ?? { en: "", vi: "" },
+                    price_vnd: Number(data.price_vnd ?? 0),
+                    duration_days: Number(data.duration_days ?? 1),
+                    level: data.level ?? "light",
                     images: data.images ?? [],
                     locations: data.locations ?? [],
                 }),
@@ -627,6 +645,26 @@ export default function AdminDashboardClient() {
     [courses, searchTerm],
   );
 
+    const revenueData = useMemo(() => {
+        const data: Record<string, { date: string; revenue: number; bookings: number }> = {};
+
+        const sortedBookings = [...bookings].sort(
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+
+        sortedBookings.forEach((b) => {
+            if (b.status === "CANCELLED") return;
+            const date = b.date;
+            if (!data[date]) {
+                data[date] = { date, revenue: 0, bookings: 0 };
+            }
+            data[date].revenue += b.totalPrice;
+            data[date].bookings += 1;
+        });
+
+        return Object.values(data).slice(-14);
+    }, [bookings]);
+
   const SidebarItem = ({
     id,
     icon: Icon,
@@ -777,86 +815,174 @@ export default function AdminDashboardClient() {
         )}
 
         {/* DASHBOARD */}
-        {!loading && activeTab === "dashboard" && (
-          <div className="space-y-8 animate-slide-up">
-            <div className="flex justify-between items-center">
-              <h1 className="text-4xl font-serif font-bold text-earth-900">
-                Dashboard
-              </h1>
-              <div className="text-sm text-stone-500 bg-white px-4 py-2 rounded-full shadow-sm border border-sand-200">
-                Welcome back,{" "}
-                <span className="font-bold text-primary">{user.name}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-primary/10 rounded-2xl text-primary">
-                    <DollarSign className="w-6 h-6" />
+          {!loading && activeTab === "dashboard" && (
+              <div className="space-y-8 animate-slide-up">
+                  <div className="flex justify-between items-center">
+                      <h1 className="text-4xl font-serif font-bold text-earth-900">
+                          Dashboard
+                      </h1>
+                      <div className="text-sm text-stone-500 bg-white px-4 py-2 rounded-full shadow-sm border border-sand-200">
+                          Welcome back, <span className="font-bold text-primary">{user.name}</span>
+                      </div>
                   </div>
-                  <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                    +12%
-                  </span>
-                </div>
-                <div className="text-stone-500 text-sm font-medium">
-                  Total Revenue
-                </div>
-                <div className="text-3xl font-bold text-earth-900 mt-1">
-                  {convertPrice(
-                    bookings.reduce(
-                      (acc, b) =>
-                        acc + (b.status !== "CANCELLED" ? b.totalPrice : 0),
-                      0,
-                    ),
-                  )}
-                </div>
-              </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-amber-100 rounded-2xl text-amber-600">
-                    <Calendar className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="text-stone-500 text-sm font-medium">
-                  Total Bookings
-                </div>
-                <div className="text-3xl font-bold text-earth-900 mt-1">
-                  {bookings.length}
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-4">
+                              <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+                                  <DollarSign className="w-6 h-6" />
+                              </div>
+                              <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
+            +12%
+          </span>
+                          </div>
+                          <div className="text-stone-500 text-sm font-medium">Total Revenue</div>
+                          <div className="text-3xl font-bold text-earth-900 mt-1">
+                              {convertPrice(
+                                  bookings.reduce(
+                                      (acc, b) => acc + (b.status !== "CANCELLED" ? b.totalPrice : 0),
+                                      0
+                                  )
+                              )}
+                          </div>
+                      </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-blue-100 rounded-2xl text-blue-600">
-                    <Map className="w-6 h-6" />
-                  </div>
-                </div>
-                <div className="text-stone-500 text-sm font-medium">
-                  Active Tours
-                </div>
-                <div className="text-3xl font-bold text-earth-900 mt-1">
-                  {tours.length}
-                </div>
-              </div>
+                      <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-4">
+                              <div className="p-3 bg-amber-100 rounded-2xl text-amber-600">
+                                  <Calendar className="w-6 h-6" />
+                              </div>
+                          </div>
+                          <div className="text-stone-500 text-sm font-medium">Total Bookings</div>
+                          <div className="text-3xl font-bold text-earth-900 mt-1">
+                              {bookings.length}
+                          </div>
+                      </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-purple-100 rounded-2xl text-purple-600">
-                    <Users className="w-6 h-6" />
+                      <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-4">
+                              <div className="p-3 bg-blue-100 rounded-2xl text-blue-600">
+                                  <Map className="w-6 h-6" />
+                              </div>
+                          </div>
+                          <div className="text-stone-500 text-sm font-medium">Active Tours</div>
+                          <div className="text-3xl font-bold text-earth-900 mt-1">{tours.length}</div>
+                      </div>
+
+                      <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-4">
+                              <div className="p-3 bg-purple-100 rounded-2xl text-purple-600">
+                                  <Users className="w-6 h-6" />
+                              </div>
+                          </div>
+                          <div className="text-stone-500 text-sm font-medium">Total Users</div>
+                          <div className="text-3xl font-bold text-earth-900 mt-1">{users.length}</div>
+                      </div>
                   </div>
-                </div>
-                <div className="text-stone-500 text-sm font-medium">
-                  Total Users
-                </div>
-                <div className="text-3xl font-bold text-earth-900 mt-1">
-                  {users.length}
-                </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200">
+                          <h3 className="text-lg font-bold text-earth-900 mb-6">
+                              Revenue Trend (Last 14 Days)
+                          </h3>
+                          <div className="h-72 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={revenueData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E3E0" />
+                                      <XAxis
+                                          dataKey="date"
+                                          axisLine={false}
+                                          tickLine={false}
+                                          tick={{ fontSize: 12, fill: "#8E9299" }}
+                                          dy={10}
+                                          tickFormatter={(val) =>
+                                              new Date(val).toLocaleDateString("en-US", {
+                                                  month: "short",
+                                                  day: "numeric",
+                                              })
+                                          }
+                                      />
+                                      <YAxis
+                                          axisLine={false}
+                                          tickLine={false}
+                                          tick={{ fontSize: 12, fill: "#8E9299" }}
+                                          tickFormatter={(val) => `₫${(val / 1000000).toFixed(1)}M`}
+                                      />
+                                      <Tooltip
+                                          formatter={(value: number) => [convertPrice(value), "Revenue"]}
+                                          labelFormatter={(label) =>
+                                              new Date(label).toLocaleDateString("en-US", {
+                                                  weekday: "long",
+                                                  year: "numeric",
+                                                  month: "long",
+                                                  day: "numeric",
+                                              })
+                                          }
+                                      />
+                                      <Line
+                                          type="monotone"
+                                          dataKey="revenue"
+                                          stroke="#115E59"
+                                          strokeWidth={3}
+                                          dot={{ r: 4, fill: "#115E59", strokeWidth: 0 }}
+                                          activeDot={{ r: 6, fill: "#F27D26", strokeWidth: 0 }}
+                                      />
+                                  </LineChart>
+                              </ResponsiveContainer>
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-6 rounded-3xl shadow-sm border border-sand-200">
+                          <h3 className="text-lg font-bold text-earth-900 mb-6">
+                              Bookings Trend (Last 14 Days)
+                          </h3>
+                          <div className="h-72 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={revenueData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E3E0" />
+                                      <XAxis
+                                          dataKey="date"
+                                          axisLine={false}
+                                          tickLine={false}
+                                          tick={{ fontSize: 12, fill: "#8E9299" }}
+                                          dy={10}
+                                          tickFormatter={(val) =>
+                                              new Date(val).toLocaleDateString("en-US", {
+                                                  month: "short",
+                                                  day: "numeric",
+                                              })
+                                          }
+                                      />
+                                      <YAxis
+                                          axisLine={false}
+                                          tickLine={false}
+                                          tick={{ fontSize: 12, fill: "#8E9299" }}
+                                          allowDecimals={false}
+                                      />
+                                      <Tooltip
+                                          formatter={(value: number) => [value, "Bookings"]}
+                                          labelFormatter={(label) =>
+                                              new Date(label).toLocaleDateString("en-US", {
+                                                  weekday: "long",
+                                                  year: "numeric",
+                                                  month: "long",
+                                                  day: "numeric",
+                                              })
+                                          }
+                                      />
+                                      <Bar
+                                          dataKey="bookings"
+                                          fill="#F27D26"
+                                          radius={[4, 4, 0, 0]}
+                                          barSize={30}
+                                      />
+                                  </BarChart>
+                              </ResponsiveContainer>
+                          </div>
+                      </div>
+                  </div>
               </div>
-            </div>
-          </div>
-        )}
+          )}
 
         {/* TOURS TAB */}
         {!loading && activeTab === "tours" && (
@@ -1358,281 +1484,408 @@ export default function AdminDashboardClient() {
       </Modal>
 
       {/* TOUR MODAL (giữ fields y chang) */}
-      <Modal
-        isOpen={tourModal.isOpen}
-        onClose={() => setTourModal((p) => ({ ...p, isOpen: false }))}
-        title={tourModal.mode === "ADD" ? "Add New Tour" : "Edit Tour Details"}
-      >
-        <form onSubmit={handleSaveTour} className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-                Title (English)
-              </label>
-              <input
-                required
-                type="text"
-                className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
-                value={tourModal.data.title?.en || ""}
-                onChange={(e) =>
-                  setTourModal((p) => ({
-                    ...p,
-                    data: {
-                      ...p.data,
-                      title: {
-                        ...(p.data.title || { en: "", vi: "" }),
-                        en: e.target.value,
-                      },
-                    },
-                  }))
-                }
-              />
-            </div>
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-                Title (Vietnamese)
-              </label>
-              <input
-                required
-                type="text"
-                className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
-                value={tourModal.data.title?.vi || ""}
-                onChange={(e) =>
-                  setTourModal((p) => ({
-                    ...p,
-                    data: {
-                      ...p.data,
-                      title: {
-                        ...(p.data.title || { en: "", vi: "" }),
-                        vi: e.target.value,
-                      },
-                    },
-                  }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-                Price (VND)
-              </label>
-              <input
-                required
-                type="number"
-                className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
-                value={tourModal.data.price_vnd ?? ""}
-                onChange={(e) =>
-                  setTourModal((p) => ({
-                    ...p,
-                    data: {
-                      ...p.data,
-                      price_vnd: parseInt(e.target.value || "0", 10),
-                    },
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-                Duration (Days)
-              </label>
-              <input
-                required
-                type="number"
-                className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
-                value={tourModal.data.duration_days ?? ""}
-                onChange={(e) =>
-                  setTourModal((p) => ({
-                    ...p,
-                    data: {
-                      ...p.data,
-                      duration_days: parseInt(e.target.value || "1", 10),
-                    },
-                  }))
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-              Intensity Level
-            </label>
-            <div className="grid grid-cols-3 gap-4">
-              {(["light", "moderate", "deep"] as const).map((level) => (
-                <div
-                  key={level}
-                  onClick={() =>
-                    setTourModal((p) => ({ ...p, data: { ...p.data, level } }))
-                  }
-                  className={`cursor-pointer p-3 rounded-xl border text-center text-sm font-bold capitalize transition-all ${
-                    tourModal.data.level === level
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-sand-200 text-stone-500 hover:border-primary/50"
-                  }`}
-                >
-                  {level}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-6 border-t border-sand-100">
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-              Tour Images
-            </label>
-            <div className="flex items-center gap-4 mb-4">
-              {tourModal.data.images && tourModal.data.images.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto">
-                  {tourModal.data.images.map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="relative group w-20 h-20 flex-shrink-0"
-                    >
-                      {/* giữ UI giống bạn (img), không bắt buộc next/image trong modal */}
-                      <img
-                        src={img}
-                        className="w-full h-full object-cover rounded-lg border border-sand-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newImages = tourModal.data.images!.filter(
-                            (_, i) => i !== idx,
-                          );
-                          setTourModal((p) => ({
-                            ...p,
-                            data: { ...p.data, images: newImages },
-                          }));
-                        }}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+        <Modal
+            isOpen={tourModal.isOpen}
+            onClose={() => setTourModal((p) => ({ ...p, isOpen: false }))}
+            title={tourModal.mode === "ADD" ? "Add New Tour" : "Edit Tour"}
+        >
+            <form onSubmit={handleSaveTour} className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Title (English)
+                        </label>
+                        <input
+                            required
+                            type="text"
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
+                            value={tourModal.data.title?.en || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        title: { ...(p.data.title || { en: "", vi: "" }), en: e.target.value },
+                                    },
+                                }))
+                            }
+                        />
                     </div>
-                  ))}
+
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Title (Vietnamese)
+                        </label>
+                        <input
+                            required
+                            type="text"
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
+                            value={tourModal.data.title?.vi || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        title: { ...(p.data.title || { en: "", vi: "" }), vi: e.target.value },
+                                    },
+                                }))
+                            }
+                        />
+                    </div>
                 </div>
-              )}
 
-              <label className="cursor-pointer bg-sand-100 hover:bg-sand-200 text-stone-500 rounded-lg w-20 h-20 flex flex-col items-center justify-center border border-dashed border-stone-300 transition-colors">
-                <Plus className="w-6 h-6 mb-1" />
-                <span className="text-[10px] font-bold uppercase">Upload</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
+                <div className="grid grid-cols-2 gap-6">
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Description (English)
+                        </label>
+                        <textarea
+                            required
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 min-h-[100px]"
+                            value={tourModal.data.description?.en || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        description: { ...(p.data.description || { en: "", vi: "" }), en: e.target.value },
+                                    },
+                                }))
+                            }
+                        />
+                    </div>
 
-                    try {
-                      const driveUrl = await uploadImageToDrive(file);
-                      const current = tourModal.data.images || [];
-                      setTourModal((p) => ({
-                        ...p,
-                        data: { ...p.data, images: [...current, driveUrl] },
-                      }));
-                    } catch (err) {
-                      console.error(err);
-                      alert("Upload to Drive failed");
-                    } finally {
-                      e.currentTarget.value = "";
-                    }
-                  }}
-                />
-              </label>
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 text-sm"
-                placeholder="Paste image URL (Google Drive supported)..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const url = (e.target as HTMLInputElement).value;
-                    if (url) {
-                      const processed = processImageUrl(url);
-                      const current = tourModal.data.images || [];
-                      setTourModal((p) => ({
-                        ...p,
-                        data: { ...p.data, images: [...current, processed] },
-                      }));
-                      (e.target as HTMLInputElement).value = "";
-                    }
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="pt-6 border-t border-sand-100">
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-              Select Locations
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto p-2 border border-sand-200 rounded-xl bg-sand-50">
-              {locations.map((loc) => (
-                <div
-                  key={loc.id}
-                  onClick={() => toggleLocationForTour(loc.id)}
-                  className={`p-3 rounded-lg border cursor-pointer flex items-center gap-3 transition-all ${
-                    tourModal.data.locations?.includes(loc.id)
-                      ? "border-primary bg-primary/10"
-                      : "border-transparent hover:bg-white"
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded border flex items-center justify-center ${
-                      tourModal.data.locations?.includes(loc.id)
-                        ? "bg-primary border-primary text-white"
-                        : "border-stone-300 bg-white"
-                    }`}
-                  >
-                    {tourModal.data.locations?.includes(loc.id) && (
-                      <CheckCircle className="w-3 h-3" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-earth-900">
-                      {loc.name.en}
-                    </p>
-                    <p className="text-xs text-stone-500">{loc.region}</p>
-                  </div>
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Description (Vietnamese)
+                        </label>
+                        <textarea
+                            required
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 min-h-[100px]"
+                            value={tourModal.data.description?.vi || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        description: { ...(p.data.description || { en: "", vi: "" }), vi: e.target.value },
+                                    },
+                                }))
+                            }
+                        />
+                    </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        <div className="pt-6 border-t border-sand-100">
-            <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
-                Tour Schedules (Start dates)
-            </label>
 
-            <ScheduleEditor
-                mode={tourModal.mode}
-                tourId={tourModal.mode === "EDIT" ? String(tourModal.data.id) : undefined}
-                schedules={(tourModal.data.schedule ?? [])}
-                onChange={(next) =>
-                    setTourModal((p) => ({ ...p, data: { ...p.data, schedule: next } }))
-                }
-            />
-        </div>
-          <div className="pt-6 flex justify-end gap-3 border-t border-sand-100">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setTourModal((p) => ({ ...p, isOpen: false }))}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" className="px-8">
-              Save Changes
-            </Button>
-          </div>
-        </form>
-      </Modal>
+                <div className="grid grid-cols-2 gap-6">
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Introduction (English)
+                        </label>
+                        <textarea
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 min-h-[80px]"
+                            value={tourModal.data.introduction?.en || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        introduction: {
+                                            ...(p.data.introduction || { en: "", vi: "" }),
+                                            en: e.target.value,
+                                        },
+                                    },
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Introduction (Vietnamese)
+                        </label>
+                        <textarea
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 min-h-[80px]"
+                            value={tourModal.data.introduction?.vi || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        introduction: {
+                                            ...(p.data.introduction || { en: "", vi: "" }),
+                                            vi: e.target.value,
+                                        },
+                                    },
+                                }))
+                            }
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Meaning (English)
+                        </label>
+                        <textarea
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 min-h-[80px]"
+                            value={tourModal.data.meaning?.en || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        meaning: {
+                                            ...(p.data.meaning || { en: "", vi: "" }),
+                                            en: e.target.value,
+                                        },
+                                    },
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <div className="col-span-2 md:col-span-1">
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Meaning (Vietnamese)
+                        </label>
+                        <textarea
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 min-h-[80px]"
+                            value={tourModal.data.meaning?.vi || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: {
+                                        ...p.data,
+                                        meaning: {
+                                            ...(p.data.meaning || { en: "", vi: "" }),
+                                            vi: e.target.value,
+                                        },
+                                    },
+                                }))
+                            }
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Price (VND)
+                        </label>
+                        <input
+                            required
+                            type="number"
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
+                            value={tourModal.data.price_vnd || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: { ...p.data, price_vnd: parseInt(e.target.value || "0", 10) },
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                            Duration (Days)
+                        </label>
+                        <input
+                            required
+                            type="number"
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50"
+                            value={tourModal.data.duration_days || ""}
+                            onChange={(e) =>
+                                setTourModal((p) => ({
+                                    ...p,
+                                    data: { ...p.data, duration_days: parseInt(e.target.value || "1", 10) },
+                                }))
+                            }
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                        Intensity Level
+                    </label>
+                    <div className="grid grid-cols-3 gap-4">
+                        {["light", "moderate", "deep"].map((level) => (
+                            <div
+                                key={level}
+                                onClick={() =>
+                                    setTourModal((p) => ({
+                                        ...p,
+                                        data: { ...p.data, level: level as Tour["level"] },
+                                    }))
+                                }
+                                className={`cursor-pointer p-3 rounded-xl border text-center text-sm font-bold capitalize transition-all ${
+                                    tourModal.data.level === level
+                                        ? "border-primary bg-primary/10 text-primary"
+                                        : "border-sand-200 text-stone-500 hover:border-primary/50"
+                                }`}
+                            >
+                                {level}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="pt-6 border-t border-sand-100">
+                    <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                        Tour Images
+                    </label>
+
+                    <div className="flex items-center gap-4 mb-4">
+                        {tourModal.data.images && tourModal.data.images.length > 0 && (
+                            <div className="flex gap-2 overflow-x-auto">
+                                {tourModal.data.images.map((img, idx) => (
+                                    <div key={`${img}-${idx}`} className="relative">
+                                        <Image
+                                            src={img}
+                                            alt=""
+                                            width={80}
+                                            height={80}
+                                            className="w-20 h-20 object-cover rounded-lg border border-sand-200"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setTourModal((p) => ({
+                                                    ...p,
+                                                    data: {
+                                                        ...p.data,
+                                                        images: (p.data.images || []).filter((_, i) => i !== idx),
+                                                    },
+                                                }))
+                                            }
+                                            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <label className="cursor-pointer bg-sand-100 hover:bg-sand-200 text-stone-500 rounded-lg w-20 h-20 flex flex-col items-center justify-center border border-dashed border-stone-300 transition-colors">
+                            <Plus className="w-6 h-6 mb-1" />
+                            <span className="text-[10px] font-bold uppercase">Upload</span>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+
+                                    try {
+                                        const driveUrl = await uploadImageToDrive(file);
+                                        const current = tourModal.data.images || [];
+                                        setTourModal((p) => ({
+                                            ...p,
+                                            data: { ...p.data, images: [...current, driveUrl] },
+                                        }));
+                                    } catch (err) {
+                                        console.error(err);
+                                        alert("Upload to Drive failed");
+                                    } finally {
+                                        e.currentTarget.value = "";
+                                    }
+                                }}
+                            />
+                        </label>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            className="w-full p-3 border border-sand-200 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-sand-50 text-sm"
+                            placeholder="Paste image URL (Google Drive supported)."
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const url = (e.target as HTMLInputElement).value;
+                                    if (url) {
+                                        const processed = processImageUrl(url);
+                                        const current = tourModal.data.images || [];
+                                        setTourModal((p) => ({
+                                            ...p,
+                                            data: { ...p.data, images: [...current, processed] },
+                                        }));
+                                        (e.target as HTMLInputElement).value = "";
+                                    }
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+
+                <div className="pt-6 border-t border-sand-100">
+                    <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                        Select Locations
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto p-2 border border-sand-200 rounded-xl bg-sand-50">
+                        {locations.map((loc) => (
+                            <div
+                                key={loc.id}
+                                onClick={() => toggleLocationForTour(loc.id)}
+                                className={`p-3 rounded-lg border cursor-pointer flex items-center gap-3 transition-all ${
+                                    tourModal.data.locations?.includes(loc.id)
+                                        ? "border-primary bg-primary/10"
+                                        : "border-transparent hover:bg-white"
+                                }`}
+                            >
+                                <div
+                                    className={`w-5 h-5 rounded border flex items-center justify-center ${
+                                        tourModal.data.locations?.includes(loc.id)
+                                            ? "bg-primary border-primary text-white"
+                                            : "border-stone-300 bg-white"
+                                    }`}
+                                >
+                                    {tourModal.data.locations?.includes(loc.id) && (
+                                        <CheckCircle className="w-3 h-3" />
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-earth-900">{loc.name.en}</p>
+                                    <p className="text-xs text-stone-500">{loc.region}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="pt-6 border-t border-sand-100">
+                    <label className="block text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                        Tour Schedules (Start dates)
+                    </label>
+
+                    <ScheduleEditor
+                        mode={tourModal.mode}
+                        tourId={tourModal.mode === "EDIT" ? String(tourModal.data.id) : undefined}
+                        schedules={tourModal.data.schedule ?? []}
+                        onChange={(next) =>
+                            setTourModal((p) => ({ ...p, data: { ...p.data, schedule: next } }))
+                        }
+                    />
+                </div>
+
+                <div className="pt-6 flex justify-end gap-3 border-t border-sand-100">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setTourModal((p) => ({ ...p, isOpen: false }))}
+                    >
+                        Cancel
+                    </Button>
+                    <Button type="submit" className="px-8">
+                        Save Changes
+                    </Button>
+                </div>
+            </form>
+        </Modal>
 
       {/* LOCATION MODAL */}
       <Modal

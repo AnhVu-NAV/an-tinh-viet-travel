@@ -60,6 +60,7 @@ export default function TourDetailPage() {
 
                 setTour(data.tour ?? null);
                 setLocations(data.locations ?? []);
+                console.log(data);
             } catch (e: any) {
                 if (!alive) return;
                 setError(e?.message ?? 'Failed to load tour detail');

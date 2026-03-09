@@ -19,6 +19,8 @@ export async function GET(_req: Request, { params }: Ctx) {
         id: t.id,
         title: { vi: t.titleVi, en: t.titleEn },
         description: { vi: t.descriptionVi, en: t.descriptionEn },
+        introduction: { vi: t.introductionVi, en: t.introductionEn },
+        meaning: { vi: t.meaningVi, en: t.meaningEn },
         price_vnd: t.priceVnd,
         duration_days: t.durationDays,
         level: t.level,
@@ -47,9 +49,16 @@ export async function PUT(req: Request, { params }: Ctx) {
             durationDays: Number(body.duration_days ?? 1),
             level: body.level ?? "light",
             images: Array.isArray(body.images) ? body.images.map(String) : [],
-            // giữ optional fields nếu có gửi lên
+
             descriptionEn: body.description?.en != null ? String(body.description.en) : undefined,
             descriptionVi: body.description?.vi != null ? String(body.description.vi) : undefined,
+
+            introductionEn: body.introduction?.en != null ? String(body.introduction.en) : undefined,
+            introductionVi: body.introduction?.vi != null ? String(body.introduction.vi) : undefined,
+
+            meaningEn: body.meaning?.en != null ? String(body.meaning.en) : undefined,
+            meaningVi: body.meaning?.vi != null ? String(body.meaning.vi) : undefined,
+
             suitableForEn: body.suitable_for?.en != null ? String(body.suitable_for.en) : undefined,
             suitableForVi: body.suitable_for?.vi != null ? String(body.suitable_for.vi) : undefined,
         },
@@ -70,6 +79,8 @@ export async function PUT(req: Request, { params }: Ctx) {
         id: updated.id,
         title: { vi: updated.titleVi, en: updated.titleEn },
         description: { vi: updated.descriptionVi, en: updated.descriptionEn },
+        introduction: { vi: updated.introductionVi, en: updated.introductionEn },
+        meaning: { vi: updated.meaningVi, en: updated.meaningEn },
         price_vnd: updated.priceVnd,
         duration_days: updated.durationDays,
         level: updated.level,
@@ -82,6 +93,6 @@ export async function PUT(req: Request, { params }: Ctx) {
 
 export async function DELETE(_req: Request, { params }: Ctx) {
     const { id } = await params;
-    await prisma.tour.delete({ where: { id } }); // cascade xoá tourLocation/schedule/booking/review tuỳ schema
+    await prisma.tour.delete({ where: { id } });
     return NextResponse.json({ ok: true });
 }
