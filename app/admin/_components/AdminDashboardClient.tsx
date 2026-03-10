@@ -909,9 +909,9 @@ export default function AdminDashboardClient() {
                                           tickFormatter={(val) => `₫${(val / 1000000).toFixed(1)}M`}
                                       />
                                       <Tooltip
-                                          formatter={(value: number) => [convertPrice(value), "Revenue"]}
+                                          formatter={(value) => [convertPrice(Number(value ?? 0)), "Revenue"]}
                                           labelFormatter={(label) =>
-                                              new Date(label).toLocaleDateString("en-US", {
+                                              new Date(String(label)).toLocaleDateString("en-US", {
                                                   weekday: "long",
                                                   year: "numeric",
                                                   month: "long",
@@ -960,9 +960,9 @@ export default function AdminDashboardClient() {
                                           allowDecimals={false}
                                       />
                                       <Tooltip
-                                          formatter={(value: number) => [value, "Bookings"]}
+                                          formatter={(value) => [Number(value ?? 0), "Bookings"]}
                                           labelFormatter={(label) =>
-                                              new Date(label).toLocaleDateString("en-US", {
+                                              new Date(String(label)).toLocaleDateString("en-US", {
                                                   weekday: "long",
                                                   year: "numeric",
                                                   month: "long",
