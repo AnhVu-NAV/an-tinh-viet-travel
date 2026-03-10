@@ -76,7 +76,7 @@ export default function ProfileClient() {
 
     useEffect(() => {
         if (!sessionReady) return;
-        if (!user || (user.role !== "ADMIN" && user.role !== "SALE")) {
+        if (!user) {
             router.replace("/login");
         }
     }, [sessionReady, user, router]);

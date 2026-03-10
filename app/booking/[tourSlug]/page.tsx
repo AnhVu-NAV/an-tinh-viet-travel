@@ -31,9 +31,10 @@ export default function BookingPage() {
     const [guests, setGuests] = useState(1);
 
     // contact info (schema Booking có contactName/contactEmail/contactPhone)
-    const [contactName, setContactName] = useState("");
+    const [contactName, setContactName] = useState(user?.name ?? "");
     const [contactEmail, setContactEmail] = useState(user?.email ?? "");
-    const [contactPhone, setContactPhone] = useState("");
+    const [contactPhone, setContactPhone] = useState(user?.phone ?? "");
+    const [emailSent, setEmailSent] = useState<boolean | null>(null);
 
     // discount
     const [discountCode, setDiscountCode] = useState("");
@@ -50,6 +51,7 @@ export default function BookingPage() {
                 if (!res.ok) throw new Error("Tour not found");
                 const data = await res.json();
                 if (!alive) return;
+
                 setTour(data.tour);
             } catch {
                 if (alive) setTour(null);
@@ -61,6 +63,14 @@ export default function BookingPage() {
             alive = false;
         };
     }, [tourId]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        setContactName((prev) => prev || user.name || "");
+        setContactEmail((prev) => prev || user.email || "");
+        setContactPhone((prev) => prev || user.phone || "");
+    }, [user]);
 
     const totalPrice = useMemo(() => {
         const price = Number(tour?.price_vnd ?? 0);
@@ -109,12 +119,28 @@ export default function BookingPage() {
     const handleBooking = async () => {
         if (!tour) return;
 
-        // validate contact nếu user chưa login
-        if (!user) {
-            if (!contactEmail.trim()) {
-                alert(language === "vi" ? "Vui lòng nhập Email" : "Please enter email");
-                return;
-            }
+        if (!selectedSchedule) {
+            alert(language === "vi" ? "Vui lòng chọn lịch khởi hành" : "Please select a schedule");
+            return;
+        }
+
+        const finalContactName = (user?.name || contactName || "").trim();
+        const finalContactEmail = (user?.email || contactEmail || "").trim();
+        const finalContactPhone = (user?.phone || contactPhone || "").trim();
+
+        if (!finalContactName) {
+            alert(language === "vi" ? "Vui lòng nhập họ tên" : "Please enter your name");
+            return;
+        }
+
+        if (!finalContactEmail) {
+            alert(language === "vi" ? "Vui lòng nhập email" : "Please enter email");
+            return;
+        }
+
+        if (!finalContactPhone) {
+            alert(language === "vi" ? "Vui lòng nhập số điện thoại" : "Please enter phone number");
+            return;
         }
 
         const payload = {
@@ -124,28 +150,34 @@ export default function BookingPage() {
             currency: "VND",
             discountCode: appliedDiscount?.code ?? null,
 
+            userId: user?.id ?? null,
             userEmail: user?.email ?? null,
 
-            contactName: contactName || null,
-            contactEmail: contactEmail || null,
-            contactPhone: contactPhone || null,
+            contactName: finalContactName,
+            contactEmail: finalContactEmail,
+            contactPhone: finalContactPhone,
         };
 
-        const res = await fetch("/api/bookings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        console.log("emailSent:", data.emailSent);
+        try {
+            const res = await fetch("/api/bookings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            alert(err?.message ?? "Booking failed");
-            return;
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                alert(data?.message ?? (language === "vi" ? "Đặt tour thất bại" : "Booking failed"));
+                return;
+            }
+
+            setEmailSent(Boolean(data?.emailSent));
+            setStep(3);
+        } catch (error) {
+            console.error("Booking error:", error);
+            alert(language === "vi" ? "Lỗi hệ thống" : "Server error");
         }
-
-        setStep(3);
     };
 
     if (loadingTour) return <div className="min-h-screen flex items-center justify-center bg-sand-50">
@@ -332,6 +364,23 @@ export default function BookingPage() {
                             <p className="text-stone-500 mb-8 max-w-xs mx-auto">
                                 {language === "vi" ? "Cảm ơn bạn đã lựa chọn An Tịnh Việt." : "Thank you for choosing An Tinh Viet."}
                             </p>
+
+                            {emailSent === true && (
+                                <p className="text-green-600 text-sm mb-4">
+                                    {language === "vi"
+                                        ? "Email xác nhận đã được gửi thành công."
+                                        : "Confirmation email was sent successfully."}
+                                </p>
+                            )}
+
+                            {emailSent === false && (
+                                <p className="text-amber-600 text-sm mb-4">
+                                    {language === "vi"
+                                        ? "Đặt chỗ thành công nhưng gửi email xác nhận chưa thành công."
+                                        : "Booking was created, but confirmation email was not sent successfully."}
+                                </p>
+                            )}
+
                             <Button onClick={() => router.push("/")} size="lg">Return Home</Button>
                         </div>
                     )}
