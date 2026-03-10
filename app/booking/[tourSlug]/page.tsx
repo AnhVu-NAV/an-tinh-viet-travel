@@ -70,6 +70,8 @@ export default function BookingPage() {
         setContactName((prev) => prev || user.name || "");
         setContactEmail((prev) => prev || user.email || "");
         setContactPhone((prev) => prev || user.phone || "");
+        console.log("booking payload received");
+        console.log("contactEmail:", user.email);
     }, [user]);
 
     const totalPrice = useMemo(() => {
@@ -151,7 +153,6 @@ export default function BookingPage() {
             discountCode: appliedDiscount?.code ?? null,
 
             userId: user?.id ?? null,
-            userEmail: user?.email ?? null,
 
             contactName: finalContactName,
             contactEmail: finalContactEmail,

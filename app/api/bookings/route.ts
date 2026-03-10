@@ -14,8 +14,6 @@ type CreateBookingBody = {
     contactName?: string | null;
     contactEmail?: string | null;
     contactPhone?: string | null;
-
-    userEmail?: string | null;
 };
 
 export async function POST(req: Request) {
@@ -34,7 +32,7 @@ export async function POST(req: Request) {
         const discountCode = body.discountCode ? String(body.discountCode).trim().toUpperCase() : null;
 
         const email =
-            (body.userEmail ?? body.contactEmail ?? "").trim().toLowerCase() || null;
+            (body.contactEmail ?? "").trim().toLowerCase() || null;
 
         let dbUserId: string | null = null;
         if (email) {
@@ -92,7 +90,7 @@ export async function POST(req: Request) {
                 });
             }
 
-            const resolvedContactEmail = body.contactEmail ?? email ?? null;
+            const resolvedContactEmail = email;
 
             // 7) create booking
             const booking = await tx.booking.create({
