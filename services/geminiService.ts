@@ -36,6 +36,7 @@ export async function sendMessageToGeminiServer(params: {
 }) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
+    console.log("Dang Chay");
 
     const ai = new GoogleGenAI({ apiKey });
     const model = process.env.GEMINI_MODEL || "gemini-3-flash-preview";

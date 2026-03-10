@@ -356,11 +356,11 @@ Based on this result and An Tinh Viet's healing travel services, meditation retr
             <div className="max-w-3xl mx-auto">
                 {testState === "intro" && (
                     <div className="bg-white rounded-3xl shadow-sm p-10 md:p-16 text-center border border-sand-100 animate-fade-in">
-                        <div className="w-100 h-40 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8">
+                        <div className="w-full max-w-[240px] sm:max-w-[320px] h-20 sm:h-24 md:h-28 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-8 px-3">
                             <img
                                 src="/logongang.png"
                                 alt="Mental Test"
-                                className="w-150 h-150 object-contain"
+                                className="max-w-full max-h-full object-contain"
                             />
                         </div>
 
