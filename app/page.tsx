@@ -181,7 +181,7 @@ export default function HomePage() {
 
                 <div className="max-w-7xl mx-auto px-4 relative z-10">
                     <div className="text-center mb-16">
-                        <h2 className="text-3xl font-serif font-bold mb-4 text-white">Why An Tinh Viet?</h2>
+                        <h2 className="text-3xl font-serif font-bold mb-4 text-white">{language === "vi" ? "Tại sao nên chọn An Tịnh Việt?" : "Why An Tinh Viet?"}</h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
