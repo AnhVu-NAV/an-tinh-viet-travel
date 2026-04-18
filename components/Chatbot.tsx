@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageCircle, Send, Sparkles, X } from "lucide-react";
 
-import type { ChatMessage } from "@/lib/types";
+import type { ActiveJourneyPromptContext, ChatMessage } from "@/lib/types";
 import { useApp } from "@/providers/AppContext";
 
 function buildWelcomeMessage(language: "vi" | "en"): ChatMessage {
@@ -27,6 +27,7 @@ export default function Chatbot() {
     const [messages, setMessages] = useState<ChatMessage[]>(() => [buildWelcomeMessage(language)]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [activeJourneyPrompt, setActiveJourneyPrompt] = useState<ActiveJourneyPromptContext | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const displayedPromptIds = useRef<Set<string>>(new Set());
@@ -52,6 +53,15 @@ export default function Chatbot() {
         ]);
 
         pendingPrompts.forEach((prompt) => displayedPromptIds.current.add(prompt.followUpId));
+        const latestPrompt = pendingPrompts.at(-1);
+        if (latestPrompt) {
+            setActiveJourneyPrompt({
+                followUpId: latestPrompt.followUpId,
+                bookingId: latestPrompt.bookingId,
+                userId: user.id,
+                authorName: user.name,
+            });
+        }
 
         if (pendingPrompts.some((prompt) => prompt.autoOpen)) {
             setIsOpen(true);
@@ -73,6 +83,8 @@ export default function Chatbot() {
         setIsLoading(true);
 
         try {
+            const promptContext = activeJourneyPrompt;
+
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -80,6 +92,7 @@ export default function Chatbot() {
                     history: messages.concat(userMessage),
                     message: userMessage.text,
                     language,
+                    activeJourneyPrompt: promptContext,
                 }),
             });
             const data = await response.json();
@@ -92,6 +105,9 @@ export default function Chatbot() {
             };
 
             setMessages((prev) => [...prev, aiMessage]);
+            if (promptContext) {
+                setActiveJourneyPrompt(null);
+            }
         } finally {
             setIsLoading(false);
         }

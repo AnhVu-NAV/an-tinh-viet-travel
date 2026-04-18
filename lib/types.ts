@@ -112,3 +112,10 @@ export interface JourneyCarePrompt {
   ctaLabel: { vi: string; en: string };
   message: { vi: string; en: string };
 }
+
+export interface ActiveJourneyPromptContext {
+  followUpId: string;
+  bookingId: string;
+  userId?: string | null;
+  authorName?: string | null;
+}

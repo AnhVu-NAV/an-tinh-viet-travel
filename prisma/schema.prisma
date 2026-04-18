@@ -42,6 +42,7 @@ model User {
   createdAt    DateTime @default(now())
 
   bookings Booking[]
+  journeyCareResponses JourneyCareResponse[]
 }
 
 model Location {
@@ -160,6 +161,7 @@ model Booking {
   tour     Tour      @relation(fields: [tourId], references: [id])
   schedule Schedule  @relation(fields: [scheduleId], references: [id])
   followUps JourneyFollowUp[]
+  journeyCareResponses JourneyCareResponse[]
 
   @@index([contactEmail])
   @@index([contactPhone])
@@ -178,8 +180,26 @@ model JourneyFollowUp {
   updatedAt     DateTime            @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  responses JourneyCareResponse[]
 
   @@index([bookingId, dueAt])
   @@index([dueAt])
   @@unique([bookingId, kind, dayNumber])
+}
+
+model JourneyCareResponse {
+  id          String   @id @default(cuid())
+  followUpId  String
+  bookingId   String
+  userId      String?
+  authorName  String?
+  message     String
+  createdAt   DateTime @default(now())
+
+  followUp JourneyFollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  booking  Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user     User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([followUpId, createdAt])
+  @@index([bookingId, createdAt])
 }

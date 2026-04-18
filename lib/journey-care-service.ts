@@ -34,6 +34,14 @@ type BookingPromptContext = {
     };
 };
 
+type JourneyCareReplyInput = {
+    followUpId: string;
+    bookingId: string;
+    userId?: string | null;
+    authorName?: string | null;
+    message: string;
+};
+
 export async function seedJourneyFollowUpsTx(tx: Prisma.TransactionClient, input: BookingSeedInput) {
     const schedule = buildJourneyFollowUpSchedule(input.startDate, input.durationDays);
 
@@ -327,4 +335,57 @@ export async function resolveJourneyCareAfterReview(bookingId: string) {
         },
         data: { status: "COMPLETED" },
     });
+}
+
+export async function saveJourneyCareReply(input: JourneyCareReplyInput) {
+    const message = input.message.trim();
+    if (!message) return null;
+
+    const followUp = await prisma.journeyFollowUp.findUnique({
+        where: { id: input.followUpId },
+        select: {
+            id: true,
+            bookingId: true,
+            resolvedAt: true,
+            booking: {
+                select: {
+                    status: true,
+                },
+            },
+        },
+    });
+
+    if (!followUp) {
+        throw new Error("FOLLOW_UP_NOT_FOUND");
+    }
+
+    if (followUp.bookingId !== input.bookingId) {
+        throw new Error("FOLLOW_UP_BOOKING_MISMATCH");
+    }
+
+    if (followUp.booking.status === "CANCELLED") {
+        throw new Error("FOLLOW_UP_CANCELLED");
+    }
+
+    const now = new Date();
+
+    const response = await prisma.journeyCareResponse.create({
+        data: {
+            followUpId: input.followUpId,
+            bookingId: input.bookingId,
+            userId: input.userId ?? null,
+            authorName: input.authorName ?? null,
+            message,
+        },
+    });
+
+    await prisma.journeyFollowUp.update({
+        where: { id: input.followUpId },
+        data: {
+            resolvedAt: followUp.resolvedAt ?? now,
+            chatPromptedAt: now,
+        },
+    });
+
+    return response;
 }

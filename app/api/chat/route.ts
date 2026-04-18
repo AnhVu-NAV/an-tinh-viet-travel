@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { saveJourneyCareReply } from "@/lib/journey-care-service";
 import { sendMessageToGeminiServer } from "@/services/geminiService";
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { history = [], language = "vi", message = "" } = body;
+        const { history = [], language = "vi", message = "", activeJourneyPrompt = null } = body;
+
+        if (activeJourneyPrompt?.followUpId && activeJourneyPrompt?.bookingId && message.trim()) {
+            await saveJourneyCareReply({
+                followUpId: String(activeJourneyPrompt.followUpId),
+                bookingId: String(activeJourneyPrompt.bookingId),
+                userId: activeJourneyPrompt.userId ? String(activeJourneyPrompt.userId) : null,
+                authorName: activeJourneyPrompt.authorName ? String(activeJourneyPrompt.authorName) : null,
+                message: String(message),
+            });
+        }
 
         const tours = await prisma.tour.findMany({
             select: { id: true, titleEn: true, titleVi: true, descriptionEn: true, level: true },
