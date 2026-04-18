@@ -227,6 +227,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [authReady]);
 
+    useEffect(() => {
+        if (!authReady || !user?.id) return;
+
+        let disposed = false;
+
+        const syncJourneyCare = async () => {
+            if (disposed || document.visibilityState === "hidden") return;
+            try {
+                await refreshInternal(user);
+            } catch {
+                // ignore background refresh errors
+            }
+        };
+
+        const handleFocus = () => {
+            void syncJourneyCare();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                void syncJourneyCare();
+            }
+        };
+
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        const intervalId = window.setInterval(() => {
+            void syncJourneyCare();
+        }, 60_000);
+
+        return () => {
+            disposed = true;
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.clearInterval(intervalId);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authReady, user?.id]);
+
     const login = async (email: string, password: string) => {
         setError(null);
 
