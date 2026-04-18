@@ -22,7 +22,7 @@ function buildWelcomeMessage(language: "vi" | "en"): ChatMessage {
 }
 
 export default function Chatbot() {
-    const { journeyCarePrompts, language, sessionReady, user } = useApp();
+    const { journeyCarePrompts, language, refresh, sessionReady, user } = useApp();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>(() => [buildWelcomeMessage(language)]);
     const [inputValue, setInputValue] = useState("");
@@ -107,11 +107,16 @@ export default function Chatbot() {
             setMessages((prev) => [...prev, aiMessage]);
             if (promptContext) {
                 setActiveJourneyPrompt(null);
+                await refresh().catch(() => undefined);
             }
         } finally {
             setIsLoading(false);
         }
     };
+
+    const activePrompt = activeJourneyPrompt
+        ? journeyCarePrompts.find((prompt) => prompt.followUpId === activeJourneyPrompt.followUpId)
+        : null;
 
     return (
         <>
@@ -210,6 +215,18 @@ export default function Chatbot() {
                 </div>
 
                 <div className="flex-shrink-0 rounded-b-2xl border-t border-stone-100 bg-white p-3">
+                    {activePrompt && (
+                        <div className="mb-3 rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                            {activePrompt.kind === "DAILY_CHECKIN"
+                                ? language === "vi"
+                                    ? `Phản hồi này sẽ được lưu cho cảm nhận ngày ${activePrompt.dayNumber} của chuyến đi.`
+                                    : `This reply will be saved for day ${activePrompt.dayNumber} of your journey.`
+                                : language === "vi"
+                                  ? "Phản hồi này sẽ được lưu cho cảm nhận sau chuyến đi."
+                                  : "This reply will be saved as your post-trip feedback."}
+                        </div>
+                    )}
+
                     <div className="flex items-center space-x-2">
                         <input
                             type="text"

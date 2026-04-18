@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle, Clock, MessageCircleHeart, Package, Star, XCircle } from "lucide-react";
 
 import { Button } from "@/components/Button";
-import type { Booking, JourneyState, Review } from "@/lib/types";
+import type { Booking, JourneyCareResponse, JourneyState, Review } from "@/lib/types";
 import { useApp } from "@/providers/AppContext";
 
 type Lang = "vi" | "en";
@@ -29,6 +29,7 @@ type MeProfileRes = {
     bookings: Booking[];
     tours: TourLite[];
     reviews: Review[];
+    journeyCareResponses: JourneyCareResponse[];
 };
 
 function getJourneyStateLabel(state: JourneyState | undefined, language: Lang) {
@@ -68,6 +69,7 @@ export default function ProfileClient() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [tours, setTours] = useState<TourLite[]>([]);
     const [reviews, setReviews] = useState<Review[]>([]);
+    const [journeyCareResponses, setJourneyCareResponses] = useState<JourneyCareResponse[]>([]);
     const [reviewModal, setReviewModal] = useState<{ bookingId: string; tourId: string } | null>(null);
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState("");
@@ -96,6 +98,7 @@ export default function ProfileClient() {
         setBookings(data.bookings ?? []);
         setTours(data.tours ?? []);
         setReviews(data.reviews ?? []);
+        setJourneyCareResponses(data.journeyCareResponses ?? []);
     };
 
     useEffect(() => {
@@ -127,6 +130,20 @@ export default function ProfileClient() {
 
     const hasReviewed = (bookingId: string) => reviews.some((review) => review.bookingId === bookingId);
     const canCancel = (booking: Booking) => booking.status === "PAID" || booking.status === "PENDING";
+    const getJourneyCareResponses = (bookingId: string) =>
+        journeyCareResponses.filter((response) => response.bookingId === bookingId);
+    const formatJourneyCareLabel = (response: JourneyCareResponse) => {
+        if (response.followUp.kind === "DAILY_CHECKIN") {
+            return language === "vi" ? `Cảm nhận ngày ${response.followUp.dayNumber}` : `Day ${response.followUp.dayNumber} check-in`;
+        }
+
+        return language === "vi" ? "Cảm nhận sau chuyến đi" : "Post-trip feedback";
+    };
+    const formatJourneyCareTime = (value: string) =>
+        new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
+            dateStyle: "short",
+            timeStyle: "short",
+        }).format(new Date(value));
 
     const handleCancel = async (bookingId: string) => {
         const confirmed = confirm(
@@ -257,6 +274,7 @@ export default function ProfileClient() {
                                     const canReview = booking.journeyState === "FINISHED" && !isReviewed;
                                     const displayDate = booking.departureDate ?? booking.date;
                                     const stateLabel = getJourneyStateLabel(booking.journeyState, language);
+                                    const savedResponses = getJourneyCareResponses(booking.id);
 
                                     return (
                                         <div
@@ -327,6 +345,31 @@ export default function ProfileClient() {
                                                         {language === "vi"
                                                             ? "Chatbot sẽ tự động hỏi thăm bạn trong suốt hành trình."
                                                             : "The chatbot will keep checking in with you during the journey."}
+                                                    </div>
+                                                )}
+
+                                                {savedResponses.length > 0 && (
+                                                    <div className="mb-4 rounded-2xl border border-sand-100 bg-sand-50 p-4">
+                                                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-earth-900">
+                                                            <MessageCircleHeart className="h-4 w-4 text-primary" />
+                                                            {language === "vi" ? "Cảm nhận bạn đã gửi" : "Your saved check-ins"}
+                                                        </div>
+
+                                                        <div className="space-y-3">
+                                                            {savedResponses.map((response) => (
+                                                                <div key={response.id} className="rounded-xl bg-white p-3 shadow-sm">
+                                                                    <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                                                        <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">
+                                                                            {formatJourneyCareLabel(response)}
+                                                                        </span>
+                                                                        <span className="text-stone-400">
+                                                                            {formatJourneyCareTime(response.createdAt)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-sm leading-relaxed text-stone-700">{response.message}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 )}
 

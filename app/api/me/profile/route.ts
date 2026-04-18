@@ -104,6 +104,18 @@ export async function POST(req: Request) {
             where: { bookingId: { in: bookingIds } },
             orderBy: { date: "desc" },
         });
+        const journeyCareResponses = await prisma.journeyCareResponse.findMany({
+            where: { bookingId: { in: bookingIds } },
+            orderBy: [{ createdAt: "desc" }],
+            include: {
+                followUp: {
+                    select: {
+                        kind: true,
+                        dayNumber: true,
+                    },
+                },
+            },
+        });
 
         const journeyCarePrompts = await getJourneyCarePromptsForBookings(
             bookings.map((booking) => ({
@@ -161,6 +173,16 @@ export async function POST(req: Request) {
                 rating: review.rating,
                 comment: review.comment,
                 date: toDateOnly(review.date),
+            })),
+            journeyCareResponses: journeyCareResponses.map((response) => ({
+                id: response.id,
+                bookingId: response.bookingId,
+                followUpId: response.followUpId,
+                userId: response.userId,
+                authorName: response.authorName,
+                message: response.message,
+                createdAt: response.createdAt.toISOString(),
+                followUp: response.followUp,
             })),
             journeyCarePrompts,
         });

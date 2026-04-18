@@ -243,6 +243,7 @@ export async function getJourneyCarePromptsForBookings(bookings: BookingPromptCo
         where: {
             bookingId: { in: bookingIds },
             dueAt: { lte: now },
+            responses: { none: {} },
             OR: [
                 {
                     kind: JourneyFollowUpKind.DAILY_CHECKIN,

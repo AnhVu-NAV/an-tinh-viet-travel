@@ -113,6 +113,20 @@ export interface JourneyCarePrompt {
   message: { vi: string; en: string };
 }
 
+export interface JourneyCareResponse {
+  id: string;
+  bookingId: string;
+  followUpId: string;
+  userId?: string | null;
+  authorName?: string | null;
+  message: string;
+  createdAt: string;
+  followUp: {
+    kind: "DAILY_CHECKIN" | "POST_TRIP_REVIEW";
+    dayNumber: number;
+  };
+}
+
 export interface ActiveJourneyPromptContext {
   followUpId: string;
   bookingId: string;
