@@ -7,6 +7,7 @@ import { CheckCircle, Clock, MessageCircleHeart, Package, Star, XCircle } from "
 
 import { Button } from "@/components/Button";
 import type { Booking, JourneyCareResponse, JourneyState, Review } from "@/lib/types";
+import { canCancelBooking } from "@/lib/journey-care";
 import { useApp } from "@/providers/AppContext";
 
 type Lang = "vi" | "en";
@@ -129,7 +130,13 @@ export default function ProfileClient() {
     );
 
     const hasReviewed = (bookingId: string) => reviews.some((review) => review.bookingId === bookingId);
-    const canCancel = (booking: Booking) => booking.status === "PAID" || booking.status === "PENDING";
+    const canCancel = (booking: Booking) => {
+        const departureDate = booking.departureDate ?? booking.date;
+        return canCancelBooking({
+            bookingStatus: booking.status,
+            startDate: new Date(`${departureDate}T00:00:00+07:00`),
+        });
+    };
     const getJourneyCareResponses = (bookingId: string) =>
         journeyCareResponses.filter((response) => response.bookingId === bookingId);
     const formatJourneyCareLabel = (response: JourneyCareResponse) => {

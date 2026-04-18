@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { canCancelBooking } from "@/lib/journey-care";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,11 @@ export async function POST(
                 status: true,
                 guests: true,
                 scheduleId: true,
+                schedule: {
+                    select: {
+                        startDate: true,
+                    },
+                },
             },
         });
 
@@ -29,9 +36,14 @@ export async function POST(
             return NextResponse.json({ message: "Booking not found" }, { status: 404 });
         }
 
-        if (!(booking.status === "PENDING" || booking.status === "PAID")) {
+        if (
+            !canCancelBooking({
+                bookingStatus: booking.status,
+                startDate: booking.schedule.startDate,
+            })
+        ) {
             return NextResponse.json(
-                { message: "This booking cannot be cancelled" },
+                { message: "This booking can only be cancelled before the departure date" },
                 { status: 400 }
             );
         }
@@ -50,10 +62,10 @@ export async function POST(
         });
 
         return NextResponse.json({ ok: true });
-    } catch (e: any) {
-        console.error("Cancel error:", e);
+    } catch (error: unknown) {
+        console.error("Cancel error:", error);
         return NextResponse.json(
-            { message: e?.message ?? "Server error" },
+            { message: error instanceof Error ? error.message : "Server error" },
             { status: 500 }
         );
     }

@@ -61,6 +61,21 @@ export function getJourneyState(params: {
     return "IN_PROGRESS";
 }
 
+export function canCancelBooking(params: {
+    bookingStatus?: string;
+    startDate: Date;
+    now?: Date;
+}) {
+    if (!(params.bookingStatus === "PENDING" || params.bookingStatus === "PAID")) {
+        return false;
+    }
+
+    const todayKey = getVietnamDateKey(params.now ?? new Date());
+    const startKey = getVietnamDateKey(params.startDate);
+
+    return todayKey < startKey;
+}
+
 export function buildJourneyFollowUpSchedule(startDate: Date, rawDurationDays: number) {
     const durationDays = getJourneyDurationDays(rawDurationDays);
     const startKey = getVietnamDateKey(startDate);
