@@ -5,14 +5,12 @@ import { Resend } from "resend";
 
 function mustEnv(name: string) {
     const v = process.env[name];
-    console.log(name, v);
     if (!v) throw new Error(`Missing env: ${name}`);
     return v;
 }
 
 function getResend() {
     const key = process.env.RESEND_API_KEY;
-    console.log(key);
     if (!key) return null;
     return new Resend(key);
 }
@@ -29,6 +27,17 @@ export type BookingEmailPayload = {
     guests: number;
     totalVnd: number;
     discountCode?: string | null;
+};
+
+export type JourneyFollowUpEmailPayload = {
+    language: "vi" | "en";
+    toCustomer: string;
+    customerName?: string | null;
+    tourTitle: string;
+    kind: "DAILY_CHECKIN" | "POST_TRIP_REVIEW";
+    dayNumber: number;
+    durationDays: number;
+    reviewUrl: string;
 };
 
 function formatVnd(v: number) {
@@ -173,6 +182,88 @@ export async function sendBookingEmails(p: BookingEmailPayload) {
         to: [systemEmail],
         subject: `New booking #${p.bookingId}`,
         html: systemHtml({ ...p, systemEmail }),
+    });
+
+    return { ok: true, skipped: false };
+}
+
+function journeyFollowUpHtml(p: JourneyFollowUpEmailPayload) {
+    const firstName = p.customerName?.trim()?.split(/\s+/)?.at(-1) ?? (p.language === "vi" ? "bạn" : "there");
+    const body =
+        p.kind === "DAILY_CHECKIN"
+            ? p.language === "vi"
+                ? `
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">Chào ${firstName}, hôm nay là ngày ${p.dayNumber}/${p.durationDays} của hành trình <b>${p.tourTitle}</b>.</p>
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">An muốn hỏi thăm xem ngày đi vừa rồi của bạn thế nào, có cần hỗ trợ gì thêm không.</p>
+        <p style="margin:0; color:#344e41; font-size:15px;">Bạn chỉ cần quay lại website và nhắn cho chatbot, hoặc mở trang hành trình để chia sẻ cảm nhận.</p>
+      `
+                : `
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">Hi ${firstName}, today is day ${p.dayNumber}/${p.durationDays} of your <b>${p.tourTitle}</b> journey.</p>
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">An is checking in to see how the day has felt and whether you need any support.</p>
+        <p style="margin:0; color:#344e41; font-size:15px;">Come back to the website and reply in the chatbot, or open your journey page to share your thoughts.</p>
+      `
+            : p.language === "vi"
+                ? `
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">Chào ${firstName}, hành trình <b>${p.tourTitle}</b> của bạn đã kết thúc.</p>
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">An rất muốn biết chuyến đi đã chạm tới bạn như thế nào để đội ngũ chăm sóc tốt hơn ở những hành trình sau.</p>
+        <p style="margin:0; color:#344e41; font-size:15px;">Bạn có thể quay lại website để nhắn cho chatbot hoặc để lại đánh giá nhanh.</p>
+      `
+                : `
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">Hi ${firstName}, your <b>${p.tourTitle}</b> journey has now finished.</p>
+        <p style="margin:0 0 12px; color:#344e41; font-size:15px;">An would love to hear how the trip landed for you so the team can care for future journeys better.</p>
+        <p style="margin:0; color:#344e41; font-size:15px;">You can come back to the website to chat with An or leave a quick review.</p>
+      `;
+
+    return `
+  <div style="font-family: ui-sans-serif, system-ui, -apple-system; background:#fdfbf7; padding:24px;">
+    <div style="max-width:640px; margin:0 auto; background:#ffffff; border-radius:16px; overflow:hidden; border:1px solid #e3d5ca;">
+      <div style="padding:20px 24px; background:#3a5a40; color:#fff;">
+        <div style="font-size:14px; letter-spacing:.08em; text-transform:uppercase; opacity:.9;">An Tinh Viet</div>
+        <div style="font-size:22px; font-weight:800; margin-top:6px;">${
+            p.kind === "DAILY_CHECKIN"
+                ? p.language === "vi"
+                    ? "An đang hỏi thăm hành trình của bạn"
+                    : "An is checking in on your journey"
+                : p.language === "vi"
+                    ? "An muốn nghe cảm nhận sau chuyến đi"
+                    : "An would love your post-trip feedback"
+        }</div>
+      </div>
+
+      <div style="padding:24px;">
+        ${body}
+
+        <div style="margin-top:20px;">
+          <a href="${p.reviewUrl}" style="display:inline-block; background:#588157; color:#fff; text-decoration:none; font-weight:700; padding:12px 18px; border-radius:999px;">
+            ${p.language === "vi" ? "Mở hành trình của tôi" : "Open my journey"}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+export async function sendJourneyFollowUpEmail(p: JourneyFollowUpEmailPayload) {
+    const resend = getResend();
+    if (!resend) {
+        console.warn("RESEND_API_KEY missing: skip sending journey follow-up emails");
+        return { ok: true, skipped: true };
+    }
+
+    const from = mustEnv("MAIL_FROM");
+
+    await resend.emails.send({
+        from,
+        to: [p.toCustomer],
+        subject:
+            p.kind === "DAILY_CHECKIN"
+                ? p.language === "vi"
+                    ? `An đang hỏi thăm ngày ${p.dayNumber}/${p.durationDays} của chuyến đi`
+                    : `An is checking in on day ${p.dayNumber}/${p.durationDays} of your journey`
+                : p.language === "vi"
+                    ? "Cảm nhận của bạn sau chuyến đi thế nào?"
+                    : "How did the journey feel for you?",
+        html: journeyFollowUpHtml(p),
     });
 
     return { ok: true, skipped: false };

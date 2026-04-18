@@ -4,201 +4,175 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { MessageCircle, X, Send, Sparkles } from "lucide-react";
+import { MessageCircle, Send, Sparkles, X } from "lucide-react";
 
+import type { ChatMessage } from "@/lib/types";
 import { useApp } from "@/providers/AppContext";
-import type { ChatMessage } from "@/lib/types"; // hoặc "@/types" tùy dự án bạn
+
+function buildWelcomeMessage(language: "vi" | "en"): ChatMessage {
+    return {
+        id: "welcome",
+        sender: "ai",
+        text:
+            language === "vi"
+                ? "Chào bạn, tôi là An. Tôi có thể đồng hành với bạn trước, trong và sau chuyến đi. Hôm nay bạn đang thấy thế nào?"
+                : "Hello, I am An. I can stay with you before, during, and after the journey. How are you feeling today?",
+        timestamp: Date.now(),
+    };
+}
 
 export default function Chatbot() {
-    const { language, user, bookings, reviews, tours } = useApp();
+    const { journeyCarePrompts, language, sessionReady, user } = useApp();
     const [isOpen, setIsOpen] = useState(false);
-    const hasAskedForReview = useRef(false);
-
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        {
-            id: "welcome",
-            sender: "ai",
-            text:
-                language === "vi"
-                    ? "Chào bạn, tôi là An. Tâm trạng hôm nay của bạn thế nào? (Căng thẳng, buồn phiền, hay muốn tìm sự bình yên?)"
-                    : "Hello, I am An. How is your mood today? (Stressed, sad, or seeking peace?)",
-            timestamp: Date.now(),
-        },
-    ]);
-
+    const [messages, setMessages] = useState<ChatMessage[]>(() => [buildWelcomeMessage(language)]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const displayedPromptIds = useRef<Set<string>>(new Set());
 
-    const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    useEffect(scrollToBottom, [messages]);
-
-    // hỏi review khi user có booking completed mà chưa review
     useEffect(() => {
-        if (user && isOpen && !hasAskedForReview.current) {
-            const unreviewedBooking = bookings.find(
-                (b) =>
-                    b.userId === user.id &&
-                    b.status === "COMPLETED" &&
-                    !reviews.some((r) => r.bookingId === b.id)
-            );
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
-            if (unreviewedBooking) {
-                const tour = tours.find((t) => t.id === unreviewedBooking.tourId);
-                if (tour) {
-                    const tourName = (tour as any).title?.[language] ?? (tour as any).titleVi ?? "Tour";
-                    const messageText =
-                        language === "vi"
-                            ? `Chào ${user.name}, chúc mừng bạn đã hoàn thành chuyến đi **${tourName}**. Bạn cảm thấy thế nào? Hãy chia sẻ cảm nhận của mình nhé! [Viết đánh giá](/profile)`
-                            : `Hi ${user.name}, congratulations on completing **${tourName}**. How was your journey? Please share your thoughts! [Write a review](/profile)`;
+    useEffect(() => {
+        if (!sessionReady || !user || !journeyCarePrompts.length) return;
 
-                    setMessages((prev) => [
-                        ...prev,
-                        { id: "ai-review-" + Date.now(), sender: "ai", text: messageText, timestamp: Date.now() },
-                    ]);
-                    hasAskedForReview.current = true;
-                }
-            }
+        const pendingPrompts = journeyCarePrompts.filter((prompt) => !displayedPromptIds.current.has(prompt.followUpId));
+        if (!pendingPrompts.length) return;
+
+        setMessages((prev) => [
+            ...prev,
+            ...pendingPrompts.map((prompt, index) => ({
+                id: `${prompt.followUpId}-${index}`,
+                sender: "ai" as const,
+                text: `${prompt.message[language]}\n\n[${prompt.ctaLabel[language]}](${prompt.ctaHref})`,
+                timestamp: Date.now() + index,
+            })),
+        ]);
+
+        pendingPrompts.forEach((prompt) => displayedPromptIds.current.add(prompt.followUpId));
+
+        if (pendingPrompts.some((prompt) => prompt.autoOpen)) {
+            setIsOpen(true);
         }
-    }, [user, isOpen, bookings, reviews, tours, language]);
+    }, [journeyCarePrompts, language, sessionReady, user]);
 
     const handleSend = async () => {
         if (!inputValue.trim()) return;
 
-        const userMsg: ChatMessage = {
+        const userMessage: ChatMessage = {
             id: Date.now().toString(),
             sender: "user",
             text: inputValue,
             timestamp: Date.now(),
         };
 
-        setMessages((prev) => [...prev, userMsg]);
+        setMessages((prev) => [...prev, userMessage]);
         setInputValue("");
         setIsLoading(true);
 
         try {
-            const res = await fetch("/api/chat", {
+            const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    history: messages.concat(userMsg),
-                    message: userMsg.text,
+                    history: messages.concat(userMessage),
+                    message: userMessage.text,
                     language,
                 }),
             });
-            const data = await res.json();
-            const responseText = data.text;
+            const data = await response.json();
 
-            const aiMsg: ChatMessage = {
+            const aiMessage: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 sender: "ai",
-                text: responseText,
+                text: data.text,
                 timestamp: Date.now(),
             };
 
-            setMessages((prev) => [...prev, aiMsg]);
+            setMessages((prev) => [...prev, aiMessage]);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter") handleSend();
-    };
-
     return (
         <>
-            {/* Floating Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className={`fixed bottom-6 right-6 z-40 bg-teal-800 text-white p-4 rounded-full shadow-lg hover:bg-teal-700 transition-all duration-300 transform hover:scale-105 ${
+                className={`fixed bottom-6 right-6 z-40 rounded-full bg-teal-800 p-4 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:bg-teal-700 ${
                     isOpen ? "hidden" : "flex"
                 }`}
             >
-                <MessageCircle className="w-6 h-6" />
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-        </span>
+                <MessageCircle className="h-6 w-6" />
+                <span className="absolute -right-1 -top-1 flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
+                </span>
             </button>
 
-            {/* Chat Window */}
             <div
-                className={`fixed bottom-6 right-6 z-50 w-full max-w-sm bg-white rounded-2xl shadow-2xl transition-all duration-300 transform border border-stone-200 flex flex-col ${
-                    isOpen ? "translate-y-0 opacity-100" : "translate-y-12 opacity-0 pointer-events-none"
+                className={`fixed bottom-6 right-6 z-50 flex h-[500px] w-full max-w-sm flex-col rounded-2xl border border-stone-200 bg-white shadow-2xl transition-all duration-300 ${
+                    isOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-12 opacity-0"
                 }`}
-                style={{ height: "500px" }}
             >
-                {/* Header */}
-                <div className="bg-teal-900 text-white p-4 rounded-t-2xl flex justify-between items-center flex-shrink-0">
+                <div className="flex flex-shrink-0 items-center justify-between rounded-t-2xl bg-teal-900 p-4 text-white">
                     <div className="flex items-center space-x-2">
-                        <div className="bg-amber-400 p-1 rounded-full text-teal-900">
-                            <Sparkles className="w-4 h-4" />
+                        <div className="rounded-full bg-amber-400 p-1 text-teal-900">
+                            <Sparkles className="h-4 w-4" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-sm">An - Spiritual Guide</h3>
+                            <h3 className="text-sm font-semibold">An - Spiritual Guide</h3>
                             <p className="text-xs text-teal-200">Always here to listen</p>
                         </div>
                     </div>
                     <button onClick={() => setIsOpen(false)} className="text-teal-200 hover:text-white">
-                        <X className="w-5 h-5" />
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 bg-stone-50 space-y-4">
-                    {messages.map((msg) => (
-                        <div key={msg.id} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+                <div className="flex-1 space-y-4 overflow-y-auto bg-stone-50 p-4">
+                    {messages.map((message) => (
+                        <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
                             <div
-                                className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                                    msg.sender === "user"
-                                        ? "bg-teal-800 text-white rounded-br-none"
-                                        : "bg-white text-stone-800 border border-stone-100 rounded-bl-none"
+                                className={`max-w-[85%] rounded-2xl p-3.5 text-sm leading-relaxed shadow-sm ${
+                                    message.sender === "user"
+                                        ? "rounded-br-none bg-teal-800 text-white"
+                                        : "rounded-bl-none border border-stone-100 bg-white text-stone-800"
                                 }`}
                             >
-                                {msg.sender === "user" ? (
-                                    msg.text
+                                {message.sender === "user" ? (
+                                    message.text
                                 ) : (
-                                    <div className="markdown-body">
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                a: ({ href, children, ...props }) => {
-                                                    if (href?.startsWith("/")) {
-                                                        return (
-                                                            <Link href={href} className="text-teal-600 hover:text-teal-800 underline font-semibold">
-                                                                {children}
-                                                            </Link>
-                                                        );
-                                                    }
-                                                    return (
-                                                        <a
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-teal-600 hover:text-teal-800 underline font-semibold"
-                                                            href={href}
-                                                            {...props}
-                                                        >
-                                                            {children}
-                                                        </a>
-                                                    );
-                                                },
-                                                p: (props) => <p className="mb-2 last:mb-0" {...props} />,
-                                                ul: (props) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                                                ol: (props) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                                                li: (props) => <li className="mb-1" {...props} />,
-                                                strong: (props) => <strong className="font-bold text-teal-900" {...props} />,
-                                                h1: (props) => <h1 className="text-lg font-bold mb-2 text-teal-900" {...props} />,
-                                                h2: (props) => <h2 className="text-base font-bold mb-2 text-teal-900" {...props} />,
-                                                h3: (props) => <h3 className="text-sm font-bold mb-1 text-teal-900" {...props} />,
-                                                blockquote: (props) => (
-                                                    <blockquote className="border-l-4 border-teal-200 pl-3 italic text-stone-600 my-2" {...props} />
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            a: ({ href, children, ...props }) =>
+                                                href?.startsWith("/") ? (
+                                                    <Link href={href} className="font-semibold text-teal-600 underline hover:text-teal-800">
+                                                        {children}
+                                                    </Link>
+                                                ) : (
+                                                    <a
+                                                        href={href}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="font-semibold text-teal-600 underline hover:text-teal-800"
+                                                        {...props}
+                                                    >
+                                                        {children}
+                                                    </a>
                                                 ),
-                                            }}
-                                        >
-                                            {msg.text}
-                                        </ReactMarkdown>
-                                    </div>
+                                            p: (props) => <p className="mb-2 last:mb-0" {...props} />,
+                                            ul: (props) => <ul className="mb-2 ml-4 list-disc space-y-1" {...props} />,
+                                            ol: (props) => <ol className="mb-2 ml-4 list-decimal space-y-1" {...props} />,
+                                            li: (props) => <li className="mb-1" {...props} />,
+                                            strong: (props) => <strong className="font-bold text-teal-900" {...props} />,
+                                        }}
+                                    >
+                                        {message.text}
+                                    </ReactMarkdown>
                                 )}
                             </div>
                         </div>
@@ -206,11 +180,11 @@ export default function Chatbot() {
 
                     {isLoading && (
                         <div className="flex justify-start">
-                            <div className="bg-white p-3 rounded-2xl rounded-bl-none shadow-sm border border-stone-100">
+                            <div className="rounded-2xl rounded-bl-none border border-stone-100 bg-white p-3 shadow-sm">
                                 <div className="flex space-x-1">
-                                    <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce"></div>
-                                    <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-100"></div>
-                                    <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce delay-200"></div>
+                                    <div className="h-2 w-2 animate-bounce rounded-full bg-stone-400" />
+                                    <div className="h-2 w-2 animate-bounce rounded-full bg-stone-400 [animation-delay:100ms]" />
+                                    <div className="h-2 w-2 animate-bounce rounded-full bg-stone-400 [animation-delay:200ms]" />
                                 </div>
                             </div>
                         </div>
@@ -219,23 +193,26 @@ export default function Chatbot() {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
-                <div className="p-3 bg-white rounded-b-2xl border-t border-stone-100 flex-shrink-0">
+                <div className="flex-shrink-0 rounded-b-2xl border-t border-stone-100 bg-white p-3">
                     <div className="flex items-center space-x-2">
                         <input
                             type="text"
                             value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handleKeyPress}
+                            onChange={(event) => setInputValue(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    void handleSend();
+                                }
+                            }}
                             placeholder={language === "vi" ? "Chia sẻ cảm xúc của bạn..." : "Share your feelings..."}
-                            className="flex-1 bg-stone-100 border-0 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                            className="flex-1 rounded-full border-0 bg-stone-100 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                         />
                         <button
-                            onClick={handleSend}
-                            disabled={isLoading || !inputValue}
-                            className="bg-teal-800 text-white p-2 rounded-full hover:bg-teal-700 disabled:opacity-50"
+                            onClick={() => void handleSend()}
+                            disabled={isLoading || !inputValue.trim()}
+                            className="rounded-full bg-teal-800 p-2 text-white hover:bg-teal-700 disabled:opacity-50"
                         >
-                            <Send className="w-4 h-4" />
+                            <Send className="h-4 w-4" />
                         </button>
                     </div>
                 </div>

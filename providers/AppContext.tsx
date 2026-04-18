@@ -1,36 +1,43 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { Language, Currency, User, Booking, Tour, Location, Course, Discount, Review } from "@/lib/types";
+import React, { createContext, useContext, useEffect, useState } from "react";
+
 import { EXCHANGE_RATE } from "@/lib/constants";
+import type {
+    Booking,
+    Course,
+    Currency,
+    Discount,
+    JourneyCarePrompt,
+    Language,
+    Location,
+    Review,
+    Tour,
+    User,
+} from "@/lib/types";
 
 type AppContextType = {
     language: Language;
     setLanguage: (lang: Language) => void;
     currency: Currency;
     setCurrency: (curr: Currency) => void;
-
     user: User | null;
     authReady: boolean;
     sessionReady: boolean;
-
     login: (email: string, password: string) => Promise<User>;
     logout: () => void;
-
     tours: Tour[];
     locations: Location[];
     courses: Course[];
     discounts: Discount[];
     reviews: Review[];
     bookings: Booking[];
-
+    journeyCarePrompts: JourneyCarePrompt[];
     addBooking: (booking: Omit<Booking, "id" | "date" | "status">) => Promise<void>;
     updateBookingStatus: (id: string, status: Booking["status"]) => void;
     addReview: (review: Review) => void;
-
     convertPrice: (priceVnd: number) => string;
     t: (key: string) => string;
-
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
@@ -59,9 +66,9 @@ const translations: Record<string, { vi: string; en: string }> = {
 };
 
 async function fetchJSON<T>(url: string, signal?: AbortSignal): Promise<T> {
-    const res = await fetch(url, { signal, cache: "no-store" });
-    if (!res.ok) throw new Error(`${url} failed: ${res.status}`);
-    return res.json();
+    const response = await fetch(url, { signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`${url} failed: ${response.status}`);
+    return response.json();
 }
 
 function safeParse<T>(raw: string | null): T | null {
@@ -73,21 +80,24 @@ function safeParse<T>(raw: string | null): T | null {
     }
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error && error.message) return error.message;
+    return fallback;
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
     const [language, setLanguageState] = useState<Language>("vi");
     const [currency, setCurrencyState] = useState<Currency>("VND");
-
     const [user, setUserState] = useState<User | null>(null);
     const [authReady, setAuthReady] = useState(false);
-
     const [tours, setTours] = useState<Tour[]>([]);
     const [locations, setLocations] = useState<Location[]>([]);
     const [courses, setCourses] = useState<Course[]>([]);
     const [discounts, setDiscounts] = useState<Discount[]>([]);
     const [reviews, setReviews] = useState<Review[]>([]);
     const [bookings, setBookings] = useState<Booking[]>([]);
-
-    const [loading, setLoading] = useState<boolean>(true);
+    const [journeyCarePrompts, setJourneyCarePrompts] = useState<JourneyCarePrompt[]>([]);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [sessionReady, setSessionReady] = useState(false);
 
@@ -100,15 +110,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(priceVnd / EXCHANGE_RATE);
     };
 
-    // Hydrate localStorage
     useEffect(() => {
-        const u = safeParse<User>(localStorage.getItem(LS_KEYS.user));
-        const lang = (localStorage.getItem(LS_KEYS.lang) as Language | null) ?? null;
-        const curr = (localStorage.getItem(LS_KEYS.curr) as Currency | null) ?? null;
+        const hydratedUser = safeParse<User>(localStorage.getItem(LS_KEYS.user));
+        const lang = localStorage.getItem(LS_KEYS.lang) as Language | null;
+        const curr = localStorage.getItem(LS_KEYS.curr) as Currency | null;
 
         if (lang === "vi" || lang === "en") setLanguageState(lang);
         if (curr === "VND" || curr === "USD") setCurrencyState(curr);
-        if (u?.id && u?.email) setUserState(u);
+        if (hydratedUser?.id && hydratedUser?.email) setUserState(hydratedUser);
 
         setAuthReady(true);
     }, []);
@@ -123,19 +132,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(LS_KEYS.curr, curr);
     };
 
-    const setUser = (u: User | null) => {
-        setUserState(u);
-        if (u) localStorage.setItem(LS_KEYS.user, JSON.stringify(u));
+    const setUser = (value: User | null) => {
+        setUserState(value);
+        if (value) localStorage.setItem(LS_KEYS.user, JSON.stringify(value));
         else localStorage.removeItem(LS_KEYS.user);
     };
 
-    // ✅ refresh nhận overrideUser để tránh stale state
     const refreshInternal = async (overrideUser?: User | null) => {
         setLoading(true);
         setError(null);
-        const controller = new AbortController();
 
-        const u = overrideUser ?? user;
+        const currentUser = overrideUser ?? user;
+        const controller = new AbortController();
 
         try {
             const [toursData, locationsData, coursesData, discountsData, reviewsData] = await Promise.all([
@@ -152,21 +160,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setDiscounts(discountsData);
             setReviews(reviewsData);
 
-            if (u?.id) {
-                const res = await fetch("/api/me/profile", {
+            if (currentUser?.id) {
+                const response = await fetch("/api/me/profile", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     cache: "no-store",
-                    body: JSON.stringify({ userId: u.id, email: u.email, phone: u.phone ?? null }),
+                    body: JSON.stringify({
+                        userId: currentUser.id,
+                        email: currentUser.email,
+                        phone: currentUser.phone ?? null,
+                    }),
                     signal: controller.signal,
                 });
-                const data = await res.json().catch(() => ({}));
+                const data = await response.json().catch(() => ({}));
                 setBookings(data?.bookings ?? []);
+                setJourneyCarePrompts(data?.journeyCarePrompts ?? []);
             } else {
                 setBookings([]);
+                setJourneyCarePrompts([]);
             }
-        } catch (e: any) {
-            setError(e?.message || "Failed to load data");
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, "Failed to load data"));
         } finally {
             setLoading(false);
         }
@@ -181,7 +195,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         (async () => {
             try {
-                // load core data
                 const [toursData, locationsData, coursesData] = await Promise.all([
                     fetchJSON<Tour[]>("/api/tours", controller.signal),
                     fetchJSON<Location[]>("/api/locations", controller.signal),
@@ -192,15 +205,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 setLocations(locationsData);
                 setCourses(coursesData);
 
-                // ✅ nếu có user trong localStorage thì refresh bookings để “confirm”
                 if (user?.id) {
                     await refreshInternal(user);
                 }
-            } catch (e: any) {
-                if (e?.name !== "AbortError") setError(e?.message || "Failed to load data");
+
+                void fetch("/api/journey-care/process", {
+                    method: "POST",
+                    cache: "no-store",
+                }).catch(() => undefined);
+            } catch (err: unknown) {
+                if (!(err instanceof Error && err.name === "AbortError")) {
+                    setError(getErrorMessage(err, "Failed to load data"));
+                }
             } finally {
                 setLoading(false);
-                setSessionReady(true); // ✅ quan trọng
+                setSessionReady(true);
             }
         })();
 
@@ -208,19 +227,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [authReady]);
 
-    // ✅ Login returns user để LoginPage redirect theo role
     const login = async (email: string, password: string) => {
         setError(null);
 
-        const res = await fetch("/api/auth/login", {
+        const response = await fetch("/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             cache: "no-store",
             body: JSON.stringify({ email, password }),
         });
 
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.message ?? "Login failed");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.message ?? "Login failed");
 
         const nextUser: User = {
             id: data.user.id,
@@ -239,60 +257,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const logout = () => {
         setUser(null);
         setBookings([]);
+        setJourneyCarePrompts([]);
     };
 
     const addBooking = async (payload: Omit<Booking, "id" | "date" | "status">) => {
-        const res = await fetch("/api/bookings", {
+        await fetch("/api/bookings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
-        const newBooking = await res.json();
-        setBookings((prev) => [newBooking, ...prev]);
+        await refreshInternal(user);
     };
 
     const updateBookingStatus = (id: string, status: Booking["status"]) => {
-        setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+        setBookings((prev) => prev.map((booking) => (booking.id === id ? { ...booking, status } : booking)));
     };
 
     const addReview = (review: Review) => {
         setReviews((prev) => [review, ...prev]);
     };
 
-    const value = useMemo(
-        () => ({
-            language,
-            setLanguage,
-            currency,
-            setCurrency,
-            user,
-            authReady,
-            sessionReady,
-            login,
-            logout,
-            tours,
-            locations,
-            courses,
-            discounts,
-            reviews,
-            bookings,
-            addBooking,
-            updateBookingStatus,
-            addReview,
-            convertPrice,
-            t,
-            loading,
-            error,
-            refresh,
-        }),
-        [language, currency, user, authReady, sessionReady, tours, locations, courses, discounts, reviews, bookings, loading, error]
-    );
+    const value = {
+        language,
+        setLanguage,
+        currency,
+        setCurrency,
+        user,
+        authReady,
+        sessionReady,
+        login,
+        logout,
+        tours,
+        locations,
+        courses,
+        discounts,
+        reviews,
+        bookings,
+        journeyCarePrompts,
+        addBooking,
+        updateBookingStatus,
+        addReview,
+        convertPrice,
+        t,
+        loading,
+        error,
+        refresh,
+    };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
-    const ctx = useContext(AppContext);
-    if (!ctx) throw new Error("useApp must be used within AppProvider");
-    return ctx;
+    const context = useContext(AppContext);
+    if (!context) throw new Error("useApp must be used within AppProvider");
+    return context;
 }

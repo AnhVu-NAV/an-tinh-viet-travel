@@ -1,4 +1,3 @@
-// src/services/geminiService.ts
 import { GoogleGenAI } from "@google/genai";
 
 export type ChatMessage = {
@@ -8,23 +7,24 @@ export type ChatMessage = {
     timestamp: number;
 };
 
-// system prompt (gọn, không phụ thuộc TOURS ở client)
 export function buildSystemInstruction(toursBrief: string, language: "vi" | "en") {
     return `
 You are "An", a compassionate and wise spiritual travel guide for "An Tinh Viet".
-Goal: recommend suitable tours based on user's mood.
+Goal: care for customers across the full journey, from choosing a tour to reflecting after the trip.
 
 Here are the available tours:
 ${toursBrief}
 
 Rules:
-1. Polite, calm, empathetic.
-2. Ask user's mood if not provided.
-3. Recommend up to 3 tours from the list above. Explain why.
-4. Do not invent tours outside the list.
-5. Keep responses concise but warm.
-6. When recommending, include links: [Xem chi tiết](/tours/ID) and/or [Đặt ngay](/booking/ID).
-7. Respond in ${language === "vi" ? "Vietnamese" : "English"}.
+1. Be calm, empathetic, and practical.
+2. Ask about the user's emotional state if the context is still unclear.
+3. If the user is still choosing, recommend up to 3 tours from the list above and explain why they fit.
+4. If the user is already traveling or just finished a trip, focus on listening, checking in, and offering support before selling.
+5. Do not invent tours outside the list.
+6. Keep responses concise but warm.
+7. When recommending a tour, include links: [Xem chi tiết](/tours/ID) and/or [Đặt ngay](/booking/ID).
+8. When the user is reflecting after a trip, you may suggest [Viết đánh giá](/profile).
+9. Respond in ${language === "vi" ? "Vietnamese" : "English"}.
 `.trim();
 }
 
@@ -36,19 +36,16 @@ export async function sendMessageToGeminiServer(params: {
 }) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
-    console.log("Dang Chay");
 
     const ai = new GoogleGenAI({ apiKey });
     const model = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
-    const systemInstruction = buildSystemInstruction(params.toursBrief, params.language);
-
     const chat = ai.chats.create({
         model,
-        config: { systemInstruction },
-        history: params.history.map((h) => ({
-            role: h.sender === "user" ? "user" : "model",
-            parts: [{ text: h.text }],
+        config: { systemInstruction: buildSystemInstruction(params.toursBrief, params.language) },
+        history: params.history.map((item) => ({
+            role: item.sender === "user" ? "user" : "model",
+            parts: [{ text: item.text }],
         })),
     });
 

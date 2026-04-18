@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 import { sendBookingEmails } from "@/lib/mailer";
+import { seedJourneyFollowUpsTx } from "@/lib/journey-care-service";
 
 type CreateBookingBody = {
     tourId: string;
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
             // 2) get tour price
             const tour = await tx.tour.findUnique({
                 where: { id: tourId },
-                select: { id: true, priceVnd: true, titleVi: true, titleEn: true },
+                select: { id: true, priceVnd: true, titleVi: true, titleEn: true, durationDays: true },
             });
             if (!tour) throw new Error("TOUR_NOT_FOUND");
 
@@ -111,6 +112,12 @@ export async function POST(req: Request) {
                 },
             });
 
+            await seedJourneyFollowUpsTx(tx, {
+                bookingId: booking.id,
+                startDate: schedule.startDate,
+                durationDays: tour.durationDays,
+            });
+
             return { booking, pricing: { totalPrice, discountAmount, finalPrice, percent } };
         });
         let emailSent = false;
@@ -150,9 +157,9 @@ export async function POST(req: Request) {
             console.error("Send booking emails failed:", mailErr);
         }
 
-        return NextResponse.json(result, { status: 201 });
-    } catch (e: any) {
-        const msg = String(e?.message ?? "");
+        return NextResponse.json({ ...result, emailSent }, { status: 201 });
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "";
 
         const map: Record<string, { status: number; message: string }> = {
             TOUR_NOT_FOUND: { status: 404, message: "Tour not found" },

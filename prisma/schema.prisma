@@ -26,6 +26,11 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum JourneyFollowUpKind {
+  DAILY_CHECKIN
+  POST_TRIP_REVIEW
+}
+
 model User {
   id           String   @id  @default(cuid())
   name         String
@@ -154,7 +159,27 @@ model Booking {
   user     User?     @relation(fields: [userId], references: [id])
   tour     Tour      @relation(fields: [tourId], references: [id])
   schedule Schedule  @relation(fields: [scheduleId], references: [id])
+  followUps JourneyFollowUp[]
 
   @@index([contactEmail])
   @@index([contactPhone])
+}
+
+model JourneyFollowUp {
+  id            String              @id @default(cuid())
+  bookingId     String
+  kind          JourneyFollowUpKind
+  dayNumber     Int
+  dueAt         DateTime
+  emailSentAt   DateTime?
+  chatPromptedAt DateTime?
+  resolvedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, dueAt])
+  @@index([dueAt])
+  @@unique([bookingId, kind, dayNumber])
 }

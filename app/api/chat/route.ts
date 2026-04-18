@@ -1,21 +1,20 @@
-// src/app/api/chat/route.ts
 import { NextResponse } from "next/server";
-import { sendMessageToGeminiServer } from "@/services/geminiService";
+
 import { prisma } from "@/lib/prisma";
+import { sendMessageToGeminiServer } from "@/services/geminiService";
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { history = [], message = "", language = "vi" } = body;
+        const { history = [], language = "vi", message = "" } = body;
 
-        // lấy list tour từ DB để làm catalog ngắn
         const tours = await prisma.tour.findMany({
             select: { id: true, titleEn: true, titleVi: true, descriptionEn: true, level: true },
             orderBy: { id: "asc" },
         });
 
         const toursBrief = tours
-            .map((t) => `- ${t.titleEn} (${t.titleVi}): ${t.descriptionEn}. Level: ${t.level}. ID: ${t.id}`)
+            .map((tour) => `- ${tour.titleEn} (${tour.titleVi}): ${tour.descriptionEn}. Level: ${tour.level}. ID: ${tour.id}`)
             .join("\n");
 
         const text = await sendMessageToGeminiServer({
@@ -26,9 +25,13 @@ export async function POST(req: Request) {
         });
 
         return NextResponse.json({ text });
-    } catch (e: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         return NextResponse.json(
-            { text: "Xin lỗi, An đang tịnh tâm (lỗi kết nối). Vui lòng thử lại sau.", error: e?.message },
+            {
+                text: "Xin lỗi, An đang tĩnh tâm một chút. Vui lòng thử lại sau.",
+                error: errorMessage,
+            },
             { status: 500 }
         );
     }
