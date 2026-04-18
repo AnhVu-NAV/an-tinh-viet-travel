@@ -35,39 +35,57 @@ type BookingPromptContext = {
 };
 
 export async function seedJourneyFollowUpsTx(tx: Prisma.TransactionClient, input: BookingSeedInput) {
-    const data = buildJourneyFollowUpSchedule(input.startDate, input.durationDays).map((item) => ({
-        bookingId: input.bookingId,
-        kind: item.kind,
-        dayNumber: item.dayNumber,
-        dueAt: item.dueAt,
-    }));
+    const schedule = buildJourneyFollowUpSchedule(input.startDate, input.durationDays);
 
-    if (!data.length) return;
-
-    await tx.journeyFollowUp.createMany({
-        data,
-        skipDuplicates: true,
-    });
+    for (const item of schedule) {
+        await tx.journeyFollowUp.upsert({
+            where: {
+                bookingId_kind_dayNumber: {
+                    bookingId: input.bookingId,
+                    kind: item.kind,
+                    dayNumber: item.dayNumber,
+                },
+            },
+            create: {
+                bookingId: input.bookingId,
+                kind: item.kind,
+                dayNumber: item.dayNumber,
+                dueAt: item.dueAt,
+            },
+            update: {
+                dueAt: item.dueAt,
+            },
+        });
+    }
 }
 
 export async function seedJourneyFollowUpsForBookings(bookings: BookingSeedInput[]) {
     if (!bookings.length) return;
 
-    const data = bookings.flatMap((booking) =>
-        buildJourneyFollowUpSchedule(booking.startDate, booking.durationDays).map((item) => ({
-            bookingId: booking.bookingId,
-            kind: item.kind,
-            dayNumber: item.dayNumber,
-            dueAt: item.dueAt,
-        }))
-    );
+    for (const booking of bookings) {
+        const schedule = buildJourneyFollowUpSchedule(booking.startDate, booking.durationDays);
 
-    if (!data.length) return;
-
-    await prisma.journeyFollowUp.createMany({
-        data,
-        skipDuplicates: true,
-    });
+        for (const item of schedule) {
+            await prisma.journeyFollowUp.upsert({
+                where: {
+                    bookingId_kind_dayNumber: {
+                        bookingId: booking.bookingId,
+                        kind: item.kind,
+                        dayNumber: item.dayNumber,
+                    },
+                },
+                create: {
+                    bookingId: booking.bookingId,
+                    kind: item.kind,
+                    dayNumber: item.dayNumber,
+                    dueAt: item.dueAt,
+                },
+                update: {
+                    dueAt: item.dueAt,
+                },
+            });
+        }
+    }
 }
 
 export async function processDueJourneyFollowUpEmails(params?: { bookingIds?: string[] }) {

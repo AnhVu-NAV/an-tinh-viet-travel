@@ -14,29 +14,34 @@ export type JourneyCarePrompt = {
     message: { vi: string; en: string };
 };
 
+const VIETNAM_OFFSET_HOURS = 7;
+const VIETNAM_OFFSET_MS = VIETNAM_OFFSET_HOURS * 60 * 60 * 1000;
+
 export function getJourneyDurationDays(rawDurationDays: number) {
     if (!Number.isFinite(rawDurationDays) || rawDurationDays <= 0) return 1;
     return Math.max(1, Math.ceil(rawDurationDays));
 }
 
-function utcDateOnly(date: Date) {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+function getVietnamDateKey(date: Date) {
+    const shifted = new Date(date.getTime() + VIETNAM_OFFSET_MS);
+    return shifted.toISOString().slice(0, 10);
 }
 
-function addUtcDays(date: Date, days: number) {
-    const value = utcDateOnly(date);
-    value.setUTCDate(value.getUTCDate() + days);
-    return value;
+function dateKeyToUtcDate(dateKey: string, hourInVietnam = 0) {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, day, hourInVietnam - VIETNAM_OFFSET_HOURS, 0, 0, 0));
 }
 
-function withUtcHour(date: Date, hour: number) {
-    const value = utcDateOnly(date);
-    value.setUTCHours(hour, 0, 0, 0);
-    return value;
+function addDaysToDateKey(dateKey: string, days: number) {
+    const base = dateKeyToUtcDate(dateKey);
+    base.setUTCDate(base.getUTCDate() + days);
+    return getVietnamDateKey(base);
 }
 
 export function getJourneyEndDate(startDate: Date, rawDurationDays: number) {
-    return addUtcDays(startDate, getJourneyDurationDays(rawDurationDays));
+    const startKey = getVietnamDateKey(startDate);
+    const endKey = addDaysToDateKey(startKey, getJourneyDurationDays(rawDurationDays));
+    return dateKeyToUtcDate(endKey);
 }
 
 export function getJourneyState(params: {
@@ -47,21 +52,22 @@ export function getJourneyState(params: {
 }): JourneyState {
     if (params.bookingStatus === "CANCELLED") return "CANCELLED";
 
-    const today = utcDateOnly(params.now ?? new Date());
-    const start = utcDateOnly(params.startDate);
-    const end = getJourneyEndDate(params.startDate, params.rawDurationDays);
+    const todayKey = getVietnamDateKey(params.now ?? new Date());
+    const startKey = getVietnamDateKey(params.startDate);
+    const endKey = addDaysToDateKey(startKey, getJourneyDurationDays(params.rawDurationDays));
 
-    if (today < start) return "UPCOMING";
-    if (today >= end) return "FINISHED";
+    if (todayKey < startKey) return "UPCOMING";
+    if (todayKey >= endKey) return "FINISHED";
     return "IN_PROGRESS";
 }
 
 export function buildJourneyFollowUpSchedule(startDate: Date, rawDurationDays: number) {
     const durationDays = getJourneyDurationDays(rawDurationDays);
+    const startKey = getVietnamDateKey(startDate);
 
     const dailyCheckIns = Array.from({ length: durationDays }, (_, index) => {
         const dayNumber = index + 1;
-        const dueAt = withUtcHour(addUtcDays(startDate, index), 12);
+        const dueAt = dateKeyToUtcDate(addDaysToDateKey(startKey, index), 20);
         return {
             kind: "DAILY_CHECKIN" as const,
             dayNumber,
@@ -74,7 +80,7 @@ export function buildJourneyFollowUpSchedule(startDate: Date, rawDurationDays: n
         {
             kind: "POST_TRIP_REVIEW" as const,
             dayNumber: 0,
-            dueAt: withUtcHour(getJourneyEndDate(startDate, rawDurationDays), 2),
+            dueAt: dateKeyToUtcDate(addDaysToDateKey(startKey, durationDays), 9),
         },
     ];
 }
@@ -109,8 +115,8 @@ export function buildJourneyCarePrompt(params: {
                 en: "View journey",
             },
             message: {
-                vi: `${greeting}, hôm nay là ngày ${params.dayNumber}/${params.durationDays} của hành trình **${params.tourTitle}**. Bạn thấy ngày đi vừa rồi thế nào? Nếu cần hỗ trợ gì thêm, cứ nhắn cho An ngay tại đây nhé.`,
-                en: `${greetingEn}, this is day ${params.dayNumber}/${params.durationDays} of **${params.tourTitle}**. How has the journey felt so far? If you need anything, just reply here and An will stay with you.`,
+                vi: `${greeting}, An đang hỏi thăm cảm nhận của bạn sau ngày ${params.dayNumber} trong hành trình **${params.tourTitle}**. Ngày đi vừa rồi của bạn thế nào, có cần hỗ trợ gì thêm không?`,
+                en: `${greetingEn}, An is checking in after day ${params.dayNumber} of **${params.tourTitle}**. How did that day feel, and do you need any support?`,
             },
         };
     }

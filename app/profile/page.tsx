@@ -46,6 +46,20 @@ function getJourneyStateLabel(state: JourneyState | undefined, language: Lang) {
     }
 }
 
+function getJourneyBadgeStyle(state: JourneyState | undefined) {
+    switch (state) {
+        case "IN_PROGRESS":
+            return "border-amber-100 bg-amber-50 text-amber-700";
+        case "FINISHED":
+            return "border-green-100 bg-green-50 text-green-700";
+        case "CANCELLED":
+            return "border-red-100 bg-red-50 text-red-700";
+        case "UPCOMING":
+        default:
+            return "border-blue-100 bg-blue-50 text-blue-700";
+    }
+}
+
 export default function ProfileClient() {
     const router = useRouter();
     const { language, convertPrice, sessionReady, user } = useApp();
@@ -263,24 +277,18 @@ export default function ProfileClient() {
                                                     </div>
 
                                                     <div
-                                                        className={`flex items-center rounded-full border px-3 py-1 text-xs font-bold ${
-                                                            booking.status === "COMPLETED"
-                                                                ? "border-green-100 bg-green-50 text-green-700"
-                                                                : booking.status === "PENDING"
-                                                                    ? "border-yellow-100 bg-yellow-50 text-yellow-700"
-                                                                    : booking.status === "PAID"
-                                                                        ? "border-blue-100 bg-blue-50 text-blue-700"
-                                                                        : "border-red-100 bg-red-50 text-red-700"
-                                                        }`}
+                                                        className={`flex items-center rounded-full border px-3 py-1 text-xs font-bold ${getJourneyBadgeStyle(
+                                                            booking.journeyState
+                                                        )}`}
                                                     >
-                                                        {booking.status === "COMPLETED" ? (
+                                                        {booking.journeyState === "FINISHED" ? (
                                                             <CheckCircle className="mr-1 h-3 w-3" />
-                                                        ) : booking.status === "CANCELLED" ? (
+                                                        ) : booking.journeyState === "CANCELLED" ? (
                                                             <XCircle className="mr-1 h-3 w-3" />
                                                         ) : (
                                                             <Clock className="mr-1 h-3 w-3" />
                                                         )}
-                                                        {booking.status}
+                                                        {stateLabel}
                                                     </div>
                                                 </div>
 
