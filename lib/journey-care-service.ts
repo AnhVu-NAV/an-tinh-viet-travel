@@ -238,7 +238,7 @@ export async function getJourneyCarePromptsForBookings(bookings: BookingPromptCo
             OR: [
                 {
                     kind: JourneyFollowUpKind.DAILY_CHECKIN,
-                    chatPromptedAt: null,
+                    resolvedAt: null,
                 },
                 {
                     kind: JourneyFollowUpKind.POST_TRIP_REVIEW,
